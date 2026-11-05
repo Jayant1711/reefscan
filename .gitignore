@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Data (large, downloaded separately) ---
+datasets/*
+!datasets/.gitkeep
+!datasets/synthetic/README.md
+
+# --- Model weights ---
+models/**/*.pt
+models/**/*.pth
+models/**/*.onnx
+!models/.gitkeep
+
+# --- Generated artifacts ---
+results/*
+!results/.gitkeep
+reports/*
+!reports/.gitkeep
+reports/assets/*
+!reports/assets/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- Streamlit ---
+.streamlit/secrets.toml
+
+# --- session tooling artifacts (not part of the project)
+.playwright-mcp/
+.zcode/

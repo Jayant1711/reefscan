@@ -1,0 +1,29 @@
+{
+  "task": "fish",
+  "best_model": "resnet34",
+  "metric_for_best": "weighted_f1",
+  "leaderboard": [
+    {
+      "model": "resnet34",
+      "accuracy": 0.4375,
+      "top5_accuracy": 0.9583333333333334,
+      "precision_macro": 0.31199677938808373,
+      "recall_macro": 0.4375,
+      "macro_f1": 0.3462154754374868,
+      "weighted_f1": 0.3462154754374868,
+      "throughput_fps": 126.94167876171714,
+      "n_test": 48
+    },
+    {
+      "model": "mobilenet_v3",
+      "accuracy": 0.16666666666666666,
+      "top5_accuracy": 0.8125,
+      "precision_macro": 0.041666666666666664,
+      "recall_macro": 0.16666666666666666,
+      "macro_f1": 0.06666666666666667,
+      "weighted_f1": 0.06666666666666667,
+      "throughput_fps": 325.86226209276975,
+      "n_test": 48
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "model_name": "mobilenet_v3",
+  "epoch": 2,
+  "metric_for_best": "weighted_f1",
+  "value": 0.06666666666666667,
+  "class_names": [
+    "Amphiprion_ocellaris",
+    "Chromis_viridis",
+    "Lutjanus_kasmira",
+    "Pomacanthus_imperator",
+    "Sphyraena_barracuda",
+    "Zebrasoma_flavescens"
+  ]
+}

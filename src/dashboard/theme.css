@@ -1,0 +1,57 @@
+/* ReefScan AI dashboard theme */
+:root {
+    --reef-primary: #0b5fa5;
+    --reef-accent: #17a2b8;
+    --reef-bg: #f5f9fc;
+}
+
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0b5fa5 0%, #073f6e 100%);
+}
+[data-testid="stSidebar"] * {
+    color: #eaf3fb !important;
+}
+
+.reef-hero {
+    background: linear-gradient(120deg, #0b5fa5 0%, #17a2b8 60%, #2ecc71 130%);
+    color: white;
+    padding: 2rem 2rem 1.6rem 2rem;
+    border-radius: 14px;
+    margin-bottom: 1.2rem;
+}
+.reef-hero h1 { color: white !important; margin-bottom: 0.3rem; }
+.reef-hero p  { color: #eaf3fb !important; font-size: 1.05rem; }
+
+div[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #d7e6f2;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(11, 95, 165, 0.08);
+}
+div[data-testid="stMetric"] label { color: #5a6b7a !important; }
+div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+    color: var(--reef-primary) !important;
+    font-weight: 700;
+}
+
+.reef-chip {
+    display: inline-block;
+    padding: 0.18rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-right: 0.4rem;
+}
+.chip-healthy  { background: #d4f7e3; color: #157a45; }
+.chip-mild     { background: #fdf3cd; color: #8a6d00; }
+.chip-moderate { background: #ffe6cc; color: #a34e00; }
+.chip-severe   { background: #fddbd6; color: #a12c1f; }
+.chip-dead     { background: #e5e7e9; color: #4d5656; }
+
+.reef-note {
+    background: #eaf3fb;
+    border-left: 4px solid var(--reef-primary);
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+}

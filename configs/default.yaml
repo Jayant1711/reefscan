@@ -1,0 +1,179 @@
+# ============================================================================
+# ReefScan AI — master configuration
+# All modules read from this file. CLI overrides:  --set section.key=value
+# ============================================================================
+
+project:
+  name: ReefScan AI
+  version: "1.0.0"
+  seed: 42
+
+paths:
+  data_root: datasets
+  models_dir: models
+  results_dir: results
+  reports_dir: reports
+  demo_dir: models/demo
+
+device:
+  prefer_gpu: true
+  num_threads: 0          # 0 = let torch decide (all cores)
+  num_workers: 0          # DataLoader workers; keep 0 on Windows / CPU
+
+logging:
+  level: INFO
+  file: results/reefscan.log
+
+# ----------------------------------------------------------------------------
+# Phase 1 — Underwater image enhancement
+# ----------------------------------------------------------------------------
+enhancement:
+  enabled: true
+  auto_select: true        # pick the best strategy automatically
+  sample_size: 8           # number of sample images used by the selector
+  strategies:              # registry names (see src/enhancement/registry.py)
+    - clahe
+    - dark_channel
+    - udcp
+    - white_balance
+    - color_restoration
+    - gamma
+    - histogram_eq
+    - fusion_wcg           # white balance -> CLAHE -> gamma composite
+  weights:                 # weights for the composite selection score
+    uciqe: 0.40
+    uiqm: 0.30
+    ssim: 0.30
+  params:
+    clahe_clip_limit: 2.0
+    clahe_tile: 8
+    dcp_patch: 15
+    dcp_omega: 0.95
+    dcp_t0: 0.10
+    udcp_omega: 0.85
+    gamma_mean_target: 0.50
+    wb_percentile: 2.0
+    cr_red_gain: 1.15      # color-restoration red channel gain
+
+# ----------------------------------------------------------------------------
+# Phase 2 — Marine species classification (FishNet)
+# ----------------------------------------------------------------------------
+fish:
+  task_name: fish
+  raw_dir: datasets/fishnet/raw
+  data_dir: datasets/fishnet/curated   # ImageFolder layout (built by prepare_fishnet.py)
+  prepare:
+    level: family            # order | family | genus | species
+    top_k: 25                # keep the K classes with the most images
+    min_images_per_class: 60
+  image_size: 224
+  batch_size: 32
+  epochs: 15
+  lr: 0.0001
+  weight_decay: 0.0001
+  label_smoothing: 0.1
+  optimizer: adamw
+  scheduler: cosine
+  warmup_epochs: 1
+  early_stopping: 5
+  pretrained: true
+  freeze_backbone: false
+  mixup_alpha: 0.2
+  mixup_prob: 0.5
+  models: [resnet34, efficientnet_b0, mobilenet_v3, convnext_tiny]
+  metric_for_best: weighted_f1
+  augmentation:
+    horizontal_flip: 0.5
+    brightness: 0.30
+    contrast: 0.30
+    saturation: 0.30
+    hue: 0.05
+    rotation: 15
+    random_erasing: 0.25
+
+# ----------------------------------------------------------------------------
+# Phase 3 — Coral bleaching analysis (NOAA PIFSC ESD)
+# ----------------------------------------------------------------------------
+coral:
+  task_name: coral
+  hf_repo: NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Dataset
+  data_dir: datasets/coral/imagefolders
+  image_size: 224
+  batch_size: 32
+  epochs: 10
+  lr: 0.0003
+  weight_decay: 0.0001
+  label_smoothing: 0.05
+  optimizer: adamw
+  scheduler: cosine
+  warmup_epochs: 1
+  early_stopping: 4
+  pretrained: true
+  models: [resnet34, efficientnet_b0, mobilenet_v3, convnext_tiny]
+  metric_for_best: weighted_f1
+  ordinal_loss: true        # add distance-weighted penalty for severity order
+  severity:                 # Whiteness-Guided Bleaching Severity (WGBS)
+    fusion_lambda: 0.60     # BSI = lam*100*P(bleached) + (1-lam)*100*whiteness
+    thresholds: [15, 35, 60, 85]   # Healthy<Mild<Moderate<Severe<Dead cut-offs
+    whiteness_s_max: 70     # HSV saturation below -> pale (bleached) pixel
+    whiteness_v_min: 140    # HSV value above -> bright (exposed) pixel
+    class_weights_index: [0, 25, 50, 75, 100]
+  classes: [healthy, mild, moderate, severe, dead]
+  class_colors:
+    healthy: "#2ecc71"
+    mild: "#f1c40f"
+    moderate: "#e67e22"
+    severe: "#e74c3c"
+    dead: "#7f8c8d"
+
+# ----------------------------------------------------------------------------
+# Fish segmentation (DeepFish) — localization boxes for the real-time view
+# ----------------------------------------------------------------------------
+seg:
+  hf_repo: Alzayats/DeepFish
+  data_dir: datasets/deepfish
+  image_size: 256
+  batch_size: 8
+  epochs: 10
+  lr: 0.0003
+  threshold: 0.5
+  min_box_area: 150
+  max_boxes: 20
+
+# ----------------------------------------------------------------------------
+# Phase 4 — Explainable AI
+# ----------------------------------------------------------------------------
+xai:
+  methods: [gradcam, gradcam_plusplus, scorecam]
+  scorecam_batch: 32
+  scorecam_max_channels: null   # cap channels for CPU speed (null = all)
+  overlay_alpha: 0.40
+
+# ----------------------------------------------------------------------------
+# Phase 5 — Real-time analysis
+# ----------------------------------------------------------------------------
+realtime:
+  frame_skip: 2           # analyze every Nth frame for video (1 = all)
+  cam_enabled: false      # overlay heatmaps in real time (slower)
+  max_frames: 0           # 0 = unlimited
+  tracker_max_disappeared: 15
+  tracker_min_distance: 40
+
+# ----------------------------------------------------------------------------
+# Phase 6 — Research analytics
+# ----------------------------------------------------------------------------
+analytics:
+  shannon_ref_classes: 25
+  margalef_ref: 3.0       # normalisation reference for Margalef richness
+  biodiversity_weights: {shannon: 0.40, simpson: 0.30, margalef: 0.30}
+  reef_health_weights: {severity: 0.60, bleached_frac: 0.25, risk: 0.15}
+  trend_ewma_alpha: 0.30
+  rare_species_pct: 1.0   # below this share of detections -> rare
+
+# ----------------------------------------------------------------------------
+# Phase 8 — PDF report
+# ----------------------------------------------------------------------------
+report:
+  institution: "Department of Computer Science & Engineering"
+  author: "ReefScan AI Project Team"
+  title: "Underwater Marine Species & Coral Reef Health Assessment"
