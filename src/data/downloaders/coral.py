@@ -35,17 +35,38 @@ def _save_via_datasets(root: Path) -> Path:
     from datasets import load_dataset
 
     ds = load_dataset(CORAL_REPO)
-    label_names = ds["train"].features["label"].names if "label" in ds["train"].features else CLASS_NAMES
-    logger.info("HF coral label names: %s", label_names)
+    sample_split = next(iter(ds.keys()))
+    features = ds[sample_split].features
+    cols = ds[sample_split].column_names
+
+    img_col = "image" if "image" in cols else next((c for c in cols if "img" in c or "image" in c), cols[0])
+    label_col = "label" if "label" in cols else ("labels" if "labels" in cols else next((c for c in cols if "label" in c or "class" in c or "target" in c), None))
+
+    label_names = CLASS_NAMES
+    if label_col and label_col in features and hasattr(features[label_col], "names"):
+        label_names = features[label_col].names
+    logger.info("HF coral cols: %s | img_col: %s | label_col: %s | label_names: %s", cols, img_col, label_col, label_names)
 
     import cv2
     import numpy as np
 
-    for split, hf_split in SPLIT_DIRS.items():
+    for split in SPLIT_DIRS.keys():
+        if split not in ds:
+            continue
         for idx, example in enumerate(ds[split]):
-            img = np.array(example["image"].convert("RGB"))
-            label = int(example["label"])
-            out_dir = root / split / str(label_names[label])
+            raw_img = example[img_col]
+            img = np.array(raw_img.convert("RGB") if hasattr(raw_img, "convert") else raw_img)
+            
+            if label_col is not None and label_col in example:
+                raw_label = example[label_col]
+                if isinstance(raw_label, int):
+                    label_str = str(label_names[raw_label]) if raw_label < len(label_names) else str(raw_label)
+                else:
+                    label_str = str(raw_label)
+            else:
+                label_str = "unknown"
+
+            out_dir = root / split / label_str
             out_dir.mkdir(parents=True, exist_ok=True)
             bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             cv2.imwrite(str(out_dir / f"{split}_{idx:06d}.jpg"), bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
@@ -114,8 +135,8 @@ def download_coral(data_dir: str | Path, force: bool = False) -> Path:
     try:
         logger.info("Loading NOAA coral dataset via `datasets` ...")
         _save_via_datasets(root)
-    except ImportError:
-        logger.info("`datasets` unavailable — falling back to parquet + pyarrow ...")
+    except Exception as exc:
+        logger.warning("`datasets` download failed (%s) — falling back to parquet + pyarrow ...", exc)
         _save_via_parquet(root)
 
     n = sum(1 for _ in root.rglob("*.jpg"))

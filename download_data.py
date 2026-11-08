@@ -39,14 +39,18 @@ def prepare_fishnet(cfg) -> None:
     from src.data.prepare_fishnet import prepare_fishnet_subset
 
     section = cfg.fish.prepare
-    out = prepare_fishnet_subset(
-        raw_dir=Path(cfg.fish.raw_dir),
-        out_dir=Path(cfg.fish.data_dir),
-        level=section.level,
-        top_k=int(section.top_k),
-        min_images_per_class=int(section.min_images_per_class),
-    )
-    logger.info("Curated FishNet subset -> %s", out)
+    try:
+        out = prepare_fishnet_subset(
+            raw_dir=Path(cfg.fish.raw_dir),
+            out_dir=Path(cfg.fish.data_dir),
+            level=section.level,
+            top_k=int(section.top_k),
+            min_images_per_class=int(section.min_images_per_class),
+        )
+        logger.info("Curated FishNet subset -> %s", out)
+    except FileNotFoundError as exc:
+        logger.warning("FishNet raw directory missing (%s).", exc)
+        logger.warning("Skipping FishNet subset preparation. To use FishNet, download the raw dataset into datasets/fishnet/raw/. See docs/DATASETS.md")
 
 
 def main() -> int:
