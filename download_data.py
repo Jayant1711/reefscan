@@ -6,7 +6,7 @@ Examples
     python download_data.py                       # everything (all 3 datasets + prepare)
     python download_data.py --dataset coral       # NOAA coral only (~770 MB)
     python download_data.py --dataset deepfish    # DeepFish tar (~7.1 GB)
-    python download_data.py --dataset fishnet     # FishNet zip (~15 GB)
+    python download_data.py --dataset fishnet     # fishnet.ai images 5.7 GB + labels 2.1 MB
     python download_data.py --prepare-fishnet     # build curated subset from the raw archive
 """
 
@@ -43,9 +43,11 @@ def prepare_fishnet(cfg) -> None:
         out = prepare_fishnet_subset(
             raw_dir=Path(cfg.fish.raw_dir),
             out_dir=Path(cfg.fish.data_dir),
-            level=section.level,
-            top_k=int(section.top_k),
-            min_images_per_class=int(section.min_images_per_class),
+            level=section.get("level", "l1"),
+            top_k=int(section.get("top_k", 12)),
+            min_images_per_class=int(section.get("min_images_per_class", 100)),
+            exclude_classes=tuple(section.get("exclude_classes", ["Human", "Unknown", "No fish"])),
+            split_fractions=tuple(section.get("split_fractions", [0.8, 0.1, 0.1])),
         )
         logger.info("Curated FishNet subset -> %s", out)
     except FileNotFoundError as exc:

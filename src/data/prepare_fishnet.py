@@ -1,150 +1,178 @@
-"""Build a curated FishNet ImageFolder subset for classification training.
+"""Build the fish classification ImageFolder from the fishnet.ai archive.
 
-FishNet ships 94,532 images with labels at four taxonomy levels
-(order / family / genus / species). Training 17k species is infeasible on free
-compute, so this script builds a *curated* subset:
+fishnet.ai (The Nature Conservancy) ships **bounding-box** annotations, not
+taxonomy CSVs — verified schema of ``foid_labels_bbox_v012.csv``:
 
-    curated/<split>/<CLASS>/<image>.jpg
+    img_id, bbox_id, x_min, x_max, y_min, y_max, label_l1, label_l2
 
-Selection rules
----------------
-- ``level``   : which taxonomy column to use as the class label.
-- ``min_images_per_class`` : drop rarer classes.
-- ``top_k``   : keep the K largest classes after filtering.
+* one row per fish/creature bbox; ``img_id`` is the image file stem
+* ``label_l1`` = 28 fine-grained classes (incl. `Human`, `Unknown`, `No fish`)
+* ``label_l2`` = 13 coarse codes (ALB, YFT, BET, LAG, DOL, OIL, SKJ, BILL, …)
+* no split column → we derive a seeded, **image-level** train/val/test split
+  (every crop of one image lands in the same split — no leakage)
 
-The extractor is schema-adaptive: FishNet archives ship annotation CSVs
-(train/val/test) whose column names may differ slightly; we match them
-heuristically. If the archive already contains a plain ImageFolder tree, it is
-used as-is.
+Preparation = *crop every fish bbox out of its frame* → classification crops:
+
+    curated/<split>/<CLASS>/<img_id>_<bbox_id>.jpg
+
+`Human` / `Unknown` / `No fish` rows are excluded by default (they are not
+fish species); classes with fewer than ``min_images_per_class`` boxes are
+dropped; ``label`` selects ``l1`` (species-ish) or ``l2`` (coarse codes).
 """
 
 from __future__ import annotations
 
 import logging
-import shutil
+from collections import defaultdict
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-LEVEL_ALIASES = {
-    "order": ("order", "label_order", "Order"),
-    "family": ("family", "label_family", "Family"),
-    "genus": ("genus", "label_genus", "Genus"),
-    "species": ("species", "label_species", "Species", "label", "class"),
-}
-SPLIT_KEYS = {"train": ("train", "training"), "validation": ("val", "validation", "valid"), "test": ("test",)}
+LABEL_CSV_CANDIDATES = ("foid_labels_bbox", "labels_bbox", "labels")
+EXCLUDE_CLASSES_DEFAULT = ("Human", "Unknown", "No fish")
+BBOX_MARGIN_FRACTION = 0.05      # widen each bbox by 5% per side for context
+DEFAULT_SPLIT = (0.8, 0.1, 0.1)  # image-level train/val/test fractions
 
 
-def _find_annotation_csvs(raw_root: Path) -> dict[str, Path]:
-    """Locate train/val/test CSVs anywhere under the extracted archive."""
-    found: dict[str, Path] = {}
-    for csv_path in raw_root.rglob("*.csv"):
-        stem = csv_path.stem.lower()
-        for split, aliases in SPLIT_KEYS.items():
-            if split in found:
-                continue
-            if any(stem.startswith(a) or a in stem for a in aliases):
-                found[split] = csv_path
-    return found
+def _find_labels_csv(raw_root: Path) -> Path | None:
+    candidates = [p for p in raw_root.rglob("*.csv")
+                  if "__MACOSX" not in p.parts]
+    for hint in LABEL_CSV_CANDIDATES:
+        matches = [p for p in candidates if hint in p.stem.lower()]
+        if matches:
+            # Prefer the non-"freq" variant (per-bbox rows, not frequency table).
+            non_freq = [p for p in matches if "freq" not in p.stem.lower()]
+            return (non_freq or matches)[0]
+    return candidates[0] if candidates else None
 
 
-def _pick_label_column(df: pd.DataFrame, level: str) -> str | None:
-    aliases = LEVEL_ALIASES.get(level, (level,))
-    for col in df.columns:
-        if col.lower() in {a.lower() for a in aliases}:
-            return col
-    return None
+def _index_images(raw_root: Path) -> dict[str, Path]:
+    """Map image file stem (== img_id) -> path, anywhere under the archive."""
+    index: dict[str, Path] = {}
+    exts = {".jpg", ".jpeg", ".png"}
+    for path in raw_root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in exts and "__MACOSX" not in path.parts:
+            index.setdefault(path.stem, path)
+    logger.info("Indexed %d images under %s", len(index), raw_root)
+    return index
 
 
-def _pick_image_column(df: pd.DataFrame) -> str | None:
-    for col in df.columns:
-        if any(token in col.lower() for token in ("path", "file", "img", "image", "name")):
-            return col
-    return None
+def _image_level_split(img_ids: list[str], fractions: tuple[float, float, float],
+                       seed: int = 42) -> dict[str, str]:
+    """Seeded split at the IMAGE level: all crops of one image share a split."""
+    rng = np.random.default_rng(seed)
+    order = rng.permutation(len(img_ids))
+    n_train = int(len(img_ids) * fractions[0])
+    n_val = int(len(img_ids) * fractions[1])
+    assignment: dict[str, str] = {}
+    for rank, idx in enumerate(order):
+        split = "train" if rank < n_train else ("validation" if rank < n_train + n_val else "test")
+        assignment[img_ids[idx]] = split
+    return assignment
 
 
-def _existing_image(img_root: Path, rel: str) -> Path | None:
-    candidates = [img_root / rel, img_root / rel.replace("\\", "/")]
-    if candidates[0].is_file():
-        return candidates[0]
-    hits = list(img_root.rglob(Path(rel).name)) if rel else []
-    return hits[0] if hits else None
+def _crop_and_save(img_path: Path, box: tuple[int, int, int, int],
+                   dest: Path, margin: float = BBOX_MARGIN_FRACTION) -> bool:
+    """Crop one bbox (with context margin) from a frame; skip degenerate boxes."""
+    img = cv2.imread(str(img_path))
+    if img is None:
+        return False
+    h, w = img.shape[:2]
+    x1, y1, x2, y2 = box
+    mx, my = int((x2 - x1) * margin), int((y2 - y1) * margin)
+    x1, y1 = max(0, x1 - mx), max(0, y1 - my)
+    x2, y2 = min(w, x2 + mx), min(h, y2 + my)
+    if x2 - x1 < 16 or y2 - y1 < 16:
+        return False  # degenerate crop — cleaned later by min-size scan anyway
+    crop = img[y1:y2, x1:x2]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    return bool(cv2.imwrite(str(dest), crop, [cv2.IMWRITE_JPEG_QUALITY, 92]))
 
 
 def prepare_fishnet_subset(
     raw_dir: str | Path,
     out_dir: str | Path,
-    level: str = "family",
-    top_k: int = 25,
-    min_images_per_class: int = 60,
-    copy_images: bool = True,
+    level: str = "l1",
+    top_k: int = 12,
+    min_images_per_class: int = 100,
+    exclude_classes: list[str] | tuple[str, ...] = EXCLUDE_CLASSES_DEFAULT,
+    split_fractions: tuple[float, float, float] = DEFAULT_SPLIT,
+    seed: int = 42,
+    copy_images: bool = True,  # unused; kept for CLI compatibility
 ) -> Path:
-    """Create the curated ImageFolder subset. Returns ``out_dir``."""
+    """Crop fish bboxes from the fishnet.ai archive into a classification ImageFolder."""
     raw_dir, out_dir = Path(raw_dir), Path(out_dir)
-    if out_dir.exists() and any(out_dir.rglob("*.jpg")) or any(out_dir.rglob("*.png")):
-        logger.info("Curated FishNet subset already present at %s — skipping.", out_dir)
+    existing = list(out_dir.rglob("*.jpg")) if out_dir.exists() else []
+    if len(existing) > 100:
+        logger.info("Curated fish subset already present at %s (%d crops) — skipping.", out_dir, len(existing))
         return out_dir
 
-    csvs = _find_annotation_csvs(raw_dir)
-    if not csvs:
-        # Maybe the archive is already an ImageFolder tree.
-        class_dirs = [d for d in raw_dir.rglob("*") if d.is_dir() and any(d.glob("*.jpg"))]
-        if class_dirs and any(d.parent != d for d in class_dirs):
-            logger.info("FishNet archive looks like an ImageFolder tree; symlinking as-is.")
-            out_dir.parent.mkdir(parents=True, exist_ok=True)
-            if not out_dir.exists():
-                try:
-                    out_dir.symlink_to(raw_dir.resolve(), target_is_directory=True)
-                except OSError:
-                    shutil.copytree(raw_dir, out_dir, dirs_exist_ok=True)
-            return out_dir
+    labels_csv = _find_labels_csv(raw_dir)
+    if labels_csv is None:
         raise FileNotFoundError(
-            f"No annotation CSVs or class folders found under {raw_dir}. "
-            "See docs/DATASETS.md for the expected FishNet layout."
+            f"No labels CSV (foid_labels_bbox*) found under {raw_dir}. "
+            "Run `python download_data.py --dataset fishnet` first."
+        )
+    logger.info("Using labels CSV: %s", labels_csv)
+    df = pd.read_csv(labels_csv)
+    required = {"img_id", "label_l1", "label_l2", "x_min", "x_max", "y_min", "y_max"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"Unexpected fishnet.ai CSV schema in {labels_csv}: missing {sorted(missing)}. "
+            f"Actual columns: {list(df.columns)}. The archive layout may have changed — "
+            "inspect the labels zip and update prepare_fishnet."
         )
 
-    logger.info("Found annotation CSVs: %s", {k: str(v) for k, v in csvs.items()})
-    out_dir.mkdir(parents=True, exist_ok=True)
+    label_col = "label_l1" if level == "l1" else "label_l2"
+    exclude = set(exclude_classes)
+    if label_col == "label_l2":
+        exclude |= {"HUMAN", "OTH", "NoF"}
 
-    # First pass: count class frequencies at the requested level (train split).
-    train_csv = csvs.get("train") or next(iter(csvs.values()))
-    df_train = pd.read_csv(train_csv)
-    label_col = _pick_label_column(df_train, level) or _pick_label_column(df_train, "species")
-    if label_col is None:
-        raise ValueError(f"No taxonomy column for level '{level}' in {train_csv} "
-                         f"(columns: {list(df_train.columns)})")
-    counts = df_train[label_col].value_counts()
-    keep = counts[counts >= min_images_per_class].sort_values(ascending=False).head(top_k)
-    keep_classes = set(keep.index.astype(str))
-    logger.info("Keeping %d '%s' classes: %s", len(keep_classes), level, sorted(keep_classes))
+    counts = df[~df[label_col].isin(exclude)][label_col].value_counts()
+    keep = set(counts[counts >= min_images_per_class].sort_values(ascending=False).head(top_k).index)
+    logger.info("Keeping %d '%s' classes (>= %d boxes): %s",
+                len(keep), label_col, min_images_per_class, sorted(keep))
 
-    for split, csv_path in csvs.items():
-        df = pd.read_csv(csv_path)
-        img_col = _pick_image_column(df)
-        if img_col is None:
-            logger.warning("No image-path column in %s; skipping split.", csv_path)
+    work = df[df[label_col].isin(keep)].copy()
+    img_index = _index_images(raw_dir)
+    missing_images = sum(1 for iid in work["img_id"].unique() if str(iid) not in img_index)
+    if missing_images:
+        logger.warning("%d labelled images not found in the archive (may belong to other releases).",
+                       missing_images)
+
+    # Split by image, then materialise crops.
+    present_ids = [str(i) for i in work["img_id"].unique() if str(i) in img_index]
+    assignment = _image_level_split(present_ids, split_fractions, seed=seed)
+
+    per_split_class = defaultdict(int)
+    saved, skipped = 0, 0
+    for row in work.itertuples(index=False):
+        img_id = str(row.img_id)
+        img_path = img_index.get(img_id)
+        if img_path is None:
+            skipped += 1
             continue
-        kept = df[df[label_col].astype(str).isin(keep_classes)]
-        copied = 0
-        for _, row in kept.iterrows():
-            src = _existing_image(raw_dir, str(row[img_col]))
-            if src is None:
-                continue
-            class_name = str(row[label_col]).replace(" ", "_").replace("/", "-")
-            dest_dir = out_dir / split / class_name
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            dest = dest_dir / src.name
-            if not dest.exists():
-                if copy_images:
-                    shutil.copy2(src, dest)
-                else:
-                    try:
-                        dest.symlink_to(src.resolve())
-                    except OSError:
-                        shutil.copy2(src, dest)
-            copied += 1
-        logger.info("Split '%s': %d images curated.", split, copied)
+        class_name = str(getattr(row, label_col)).replace(" ", "_").replace("/", "-")
+        split = assignment[img_id]
+        dest = out_dir / split / class_name / f"{img_id}_bbox{int(row.bbox_id)}.jpg"
+        if dest.exists():
+            saved += 1
+            continue
+        box = (int(row.x_min), int(row.y_min), int(row.x_max), int(row.y_max))
+        if _crop_and_save(img_path, box, dest):
+            saved += 1
+            per_split_class[(split, class_name)] += 1
+        else:
+            skipped += 1
 
+    logger.info("Cropped %d fish regions (%d skipped: missing frames/degenerate boxes).", saved, skipped)
+    for split in ("train", "validation", "test"):
+        total = sum(v for (s, _), v in per_split_class.items() if s == split)
+        classes = len({c for (s, c), v in per_split_class.items() if s == split and v > 0})
+        logger.info("Split '%s': %d crops across %d classes.", split, total, classes)
     return out_dir

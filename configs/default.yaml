@@ -63,9 +63,12 @@ fish:
   raw_dir: datasets/fishnet/raw
   data_dir: datasets/fishnet/curated   # ImageFolder layout (built by prepare_fishnet.py)
   prepare:
-    level: family            # order | family | genus | species
-    top_k: 25                # keep the K classes with the most images
-    min_images_per_class: 60
+    # fishnet.ai (TNC) bbox-annotation schema: img_id, bbox_id, x/y_min/max, label_l1, label_l2
+    level: l1                # l1 = fine-grained species (28) | l2 = coarse codes (13)
+    top_k: 12                # keep the K classes with the most fish boxes
+    min_images_per_class: 100
+    exclude_classes: [Human, Unknown, No fish]
+    split_fractions: [0.8, 0.1, 0.1]   # seeded IMAGE-level split (no crop leakage)
   image_size: 224
   batch_size: 32
   epochs: 15
