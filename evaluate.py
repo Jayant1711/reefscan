@@ -28,7 +28,7 @@ logger = logging.getLogger("evaluate")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--task", choices=["fish", "coral"], default=None)
+    parser.add_argument("--task", choices=["fish", "coral", "seg"], default=None)
     parser.add_argument("--model", default=None, help="One model or omit for all trained ones")
     parser.add_argument("--enhancement", action="store_true", help="Run Phase-1 benchmark")
     parser.add_argument("--data", default=None, help="Image folder for the enhancement benchmark")
@@ -40,6 +40,23 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_task_evaluation(cfg, task: str, model: str | None, device) -> None:
+    if task == "seg":
+        from src.segmentation.evaluate_seg import evaluate_segmentation
+
+        data_dir = Path(cfg.seg.data_dir)
+        deepfish_root = data_dir / "DeepFish" if (data_dir / "DeepFish").exists() else data_dir
+        metrics = evaluate_segmentation(
+            models_dir=cfg.paths.models_dir,
+            results_dir=Path(cfg.paths.results_dir),
+            device=device,
+            data_dir=deepfish_root,
+            image_size=cfg.seg.image_size,
+            batch_size=cfg.seg.batch_size,
+            min_box_area=cfg.seg.min_box_area,
+        )
+        logger.info("Seg metrics -> %s", Path(cfg.paths.results_dir) / "seg" / "metrics.json")
+        return metrics
+
     from src.classification.evaluate import build_leaderboard, run_model_evaluation
 
     section = cfg[task]

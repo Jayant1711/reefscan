@@ -1,0 +1,10 @@
+# Lightning AI studio profile — T4 with a persistent studio filesystem.
+# Everything stays repo-relative (the studio persists between sessions).
+device:
+  num_workers: 4
+fish:
+  batch_size: 64
+coral:
+  batch_size: 64
+seg:
+  batch_size: 16

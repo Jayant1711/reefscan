@@ -104,6 +104,85 @@ def param_groups(model: nn.Module, lr: float, head_lr_multiplier: float = 10.0) 
     return groups
 
 
+# Last-stage module per backbone (used by partial fine-tuning).
+_LAST_STAGE = {
+    "resnet34": "layer4",
+    "efficientnet_b0": "features.6",
+    "mobilenet_v3": "features.10",
+    "convnext_tiny": "stages.3",
+}
+
+
+def unfreeze_stage(model: nn.Module, name: str) -> None:
+    """Un-freeze the final stage of a backbone (partial fine-tuning).
+
+    The head stays trainable, the earlier backbone blocks stay frozen.
+    Must be called *after* ``freeze_backbone`` has been applied.
+    """
+    if name not in _LAST_STAGE:
+        raise ValueError(f"Unknown last stage for '{name}'. Supported: {sorted(_LAST_STAGE)}")
+    prefix = _LAST_STAGE[name]
+    unfrozen = 0
+    for param_name, param in model.named_parameters():
+        if "fc" in param_name or "classifier" in param_name:
+            param.requires_grad = True  # head always trains
+        elif param_name.startswith(prefix):
+            param.requires_grad = True
+            unfrozen += param.numel()
+    logger.info("Unfroze last stage '%s' of %s (%.2fM params now trainable).", prefix, name, unfrozen / 1e6)
+
+
+def strategy_param_groups(model: nn.Module, name: str, lr: float,
+                          head_lr_multiplier: float = 10.0,
+                          stage_lr_multiplier: float = 0.1) -> list[dict]:
+    """LR groups for partial fine-tuning: head fast, last stage slow, rest frozen."""
+    head_params, stage_params = [], []
+    prefix = _LAST_STAGE.get(name, "")
+    for param_name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if "fc" in param_name or "classifier" in param_name:
+            head_params.append(param)
+        elif prefix and param_name.startswith(prefix):
+            stage_params.append(param)
+    groups = []
+    if stage_params:
+        groups.append({"params": stage_params, "lr": lr * stage_lr_multiplier})
+    if head_params:
+        groups.append({"params": head_params, "lr": lr * head_lr_multiplier})
+    return groups
+
+
+def partial_finetune_groups(model: nn.Module, name: str, lr: float,
+                            head_lr_multiplier: float = 10.0,
+                            stage_lr_multiplier: float = 0.1) -> list[dict]:
+    """Optimizer groups for partial fine-tuning, **including dormant frozen params**.
+
+    The model is built with ``freeze_backbone=True``; frozen backbone params are
+    still put into the optimizer at the stage LR so that calling
+    :func:`unfreeze_stage` mid-training requires no optimizer rebuild — dormant
+    params simply never receive gradients (and are skipped by AdamW) until
+    ``requires_grad`` flips to True.
+    """
+    prefix = _LAST_STAGE.get(name, "")
+    head_params, stage_params, frozen_params = [], [], []
+    for param_name, param in model.named_parameters():
+        if "fc" in param_name or "classifier" in param_name:
+            head_params.append(param)
+        elif prefix and param_name.startswith(prefix):
+            stage_params.append(param)
+        else:
+            frozen_params.append(param)
+    groups = []
+    if frozen_params:
+        groups.append({"params": frozen_params, "lr": lr * stage_lr_multiplier})
+    if stage_params:
+        groups.append({"params": stage_params, "lr": lr * stage_lr_multiplier})
+    if head_params:
+        groups.append({"params": head_params, "lr": lr * head_lr_multiplier})
+    return groups
+
+
 def class_names_from_model(ckpt: dict) -> Sequence[str]:
     """Class names stored inside a checkpoint dict."""
     return ckpt.get("class_names", [])

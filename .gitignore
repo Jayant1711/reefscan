@@ -28,6 +28,12 @@ reports/*
 !reports/.gitkeep
 reports/assets/*
 !reports/assets/.gitkeep
+runs/*
+!runs/.gitkeep
+**/_quarantine/
+reefscan_artifacts_*.zip
+kaggle_session_status.png
+kaggle_notebook_reload.png
 
 # --- OS / editor ---
 .DS_Store

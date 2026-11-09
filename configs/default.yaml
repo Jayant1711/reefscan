@@ -78,6 +78,8 @@ fish:
   early_stopping: 5
   pretrained: true
   freeze_backbone: false
+  strategy: finetune            # feature_extraction | finetune | partial_finetune
+  freeze_epochs: 1              # partial_finetune: epochs with backbone frozen
   mixup_alpha: 0.2
   mixup_prob: 0.5
   models: [resnet34, efficientnet_b0, mobilenet_v3, convnext_tiny]
@@ -109,6 +111,8 @@ coral:
   warmup_epochs: 1
   early_stopping: 4
   pretrained: true
+  strategy: finetune            # feature_extraction | finetune | partial_finetune
+  freeze_epochs: 1              # partial_finetune: epochs with backbone frozen
   models: [resnet34, efficientnet_b0, mobilenet_v3, convnext_tiny]
   metric_for_best: weighted_f1
   ordinal_loss: true        # add distance-weighted penalty for severity order

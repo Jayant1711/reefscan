@@ -1,0 +1,16 @@
+# Google Colab profile — single T4.
+# Datasets live outside the repo clone so artifact zips stay small.
+paths:
+  data_root: /content/reefscan_data
+device:
+  num_workers: 2
+fish:
+  batch_size: 64
+  raw_dir: /content/reefscan_data/fishnet/raw
+  data_dir: /content/reefscan_data/fishnet/curated
+coral:
+  batch_size: 64
+  data_dir: /content/reefscan_data/coral/imagefolders
+seg:
+  batch_size: 16
+  data_dir: /content/reefscan_data/deepfish

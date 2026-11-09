@@ -143,7 +143,7 @@ class SegmentationTrainer:
 
     def train(self, data_dir: str | Path, num_workers: int = 0) -> dict:
         train_loader, val_loader = make_seg_loaders(data_dir, self.image_size, self.batch_size, num_workers=num_workers)
-        best_dice = -1.0
+        best_dice, best_iou = -1.0, float("nan")
         history = []
         for epoch in range(1, self.epochs + 1):
             self.model.train()
@@ -169,6 +169,7 @@ class SegmentationTrainer:
                 entry["val_dice"], entry["val_iou"] = float(np.mean(dices)), float(np.mean(ious))
                 if entry["val_dice"] > best_dice:
                     best_dice = entry["val_dice"]
+                    best_iou = entry["val_iou"]
                     torch.save({"model": self.model.state_dict(), "image_size": self.image_size},
                                self.out_dir / "best.pt")
             history.append(entry)
@@ -180,7 +181,12 @@ class SegmentationTrainer:
         if not (self.out_dir / "best.pt").exists():  # single-epoch / no-val fallback
             torch.save({"model": self.model.state_dict(), "image_size": self.image_size},
                        self.out_dir / "best.pt")
-        return {"best_val_dice": max(best_dice, 0.0), "history": history}
+        params = {
+            "params_total": sum(p.numel() for p in self.model.parameters()),
+            "params_trainable": sum(p.numel() for p in self.model.parameters() if p.requires_grad),
+        }
+        return {"best_val_dice": max(best_dice, 0.0), "best_val_iou": best_iou,
+                "epochs_ran": len(history), "params": params, "history": history}
 
     @torch.no_grad()
     def predict_mask(self, image_rgb_uint8: np.ndarray) -> np.ndarray:

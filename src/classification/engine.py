@@ -23,9 +23,11 @@ from tqdm.auto import tqdm
 
 from ..utils import ensure_dir, save_json
 from .losses import build_loss
-from .models import build_model, param_groups
+from .models import build_model, param_groups, partial_finetune_groups, unfreeze_stage
 
 logger = logging.getLogger(__name__)
+
+STRATEGIES = ("feature_extraction", "finetune", "partial_finetune")
 
 
 @dataclass
@@ -45,6 +47,8 @@ class TrainConfig:
     metric_for_best: str = "val_weighted_f1"
     amp: bool = True
     grad_clip: float = 5.0
+    strategy: str = "finetune"
+    freeze_epochs: int = 1
 
     @classmethod
     def from_cfg(cls, section: Mapping) -> "TrainConfig":
@@ -53,7 +57,10 @@ class TrainConfig:
                     "data_dir", "raw_dir", "task_name", "image_size", "batch_size", "pretrained",
                     "freeze_backbone", "models_dir")
         section = {k: v for k, v in section.items() if k not in aug_keys}
-        return cls(**section)
+        cfg = cls(**section)
+        if cfg.strategy not in STRATEGIES:
+            raise ValueError(f"Unknown strategy '{cfg.strategy}'. Supported: {STRATEGIES}")
+        return cfg
 
 
 @dataclass
@@ -95,7 +102,21 @@ class Trainer:
         self.class_names = list(class_names)
         self.out_dir = ensure_dir(out_dir)
 
-        self.model = build_model(model_name, num_classes).to(device)
+        # Strategy selection -------------------------------------------------
+        # finetune            : all params train (head at 10x LR).
+        # feature_extraction  : backbone frozen, head-only training.
+        # partial_finetune    : backbone frozen for `freeze_epochs`, then the
+        #                       last stage unfreezes at a lower LR. All params
+        #                       join the optimizer up-front; dormant (frozen)
+        #                       params simply never receive gradients until
+        #                       unfrozen, so no mid-training optimizer rebuild.
+        if cfg.strategy == "feature_extraction":
+            self.model = build_model(model_name, num_classes, freeze_backbone=True).to(device)
+        elif cfg.strategy == "partial_finetune":
+            self.model = build_model(model_name, num_classes, freeze_backbone=True).to(device)
+        else:
+            self.model = build_model(model_name, num_classes).to(device)
+
         self.criterion = build_loss(
             num_classes,
             class_weight=class_weight.to(device) if class_weight is not None else None,
@@ -103,7 +124,10 @@ class Trainer:
             ordinal=cfg.ordinal_loss,
             ordinal_lam=cfg.ordinal_lam,
         )
-        groups = param_groups(self.model, cfg.lr)
+        if cfg.strategy == "partial_finetune":
+            groups = partial_finetune_groups(self.model, model_name, cfg.lr)
+        else:
+            groups = param_groups(self.model, cfg.lr)
         if cfg.optimizer == "adamw":
             self.optimizer = torch.optim.AdamW(groups, weight_decay=cfg.weight_decay)
         else:
@@ -131,15 +155,29 @@ class Trainer:
         self.best_epoch = -1
         self._bad_epochs = 0
         self._stop = False
+        self._unfreeze_pending = cfg.strategy == "partial_finetune" and cfg.freeze_epochs > 0
+        self.params = {
+            "params_total": sum(p.numel() for p in self.model.parameters()),
+            "params_trainable": sum(p.numel() for p in self.model.parameters() if p.requires_grad),
+        }
+        logger.info("Strategy=%s | trainable %.2fM / %.2fM params",
+                    cfg.strategy, self.params["params_trainable"] / 1e6, self.params["params_total"] / 1e6)
 
     # ------------------------------------------------------------- utilities
     def _lr_now(self) -> float:
         return float(self.optimizer.param_groups[-1]["lr"])
 
+    def _maybe_unfreeze(self, epoch: int) -> None:
+        """Partial fine-tuning: unfreeze the last stage after freeze_epochs."""
+        if self._unfreeze_pending and epoch > self.cfg.freeze_epochs:
+            unfreeze_stage(self.model, self.model_name)
+            self._unfreeze_pending = False
+
     # ------------------------------------------------------------- train loop
     def fit(self) -> list[EpochLog]:
         for epoch in range(1, self.cfg.epochs + 1):
             t0 = time.time()
+            self._maybe_unfreeze(epoch)
             train_loss, train_acc = self._train_epoch()
             log = EpochLog(epoch=epoch, train_loss=train_loss, train_acc=train_acc,
                            lr=self._lr_now(), seconds=time.time() - t0)
@@ -244,6 +282,8 @@ class Trainer:
                     "metric_for_best": self.cfg.metric_for_best,
                     "value": float(value),
                     "class_names": self.class_names,
+                    "strategy": self.cfg.strategy,
+                    "params": self.params,
                 },
                 self.out_dir / "best_meta.json",
             )
@@ -255,6 +295,8 @@ class Trainer:
                     "class_names": self.class_names,
                     "epoch": log.epoch,
                     "metric": float(value),
+                    "strategy": self.cfg.strategy,
+                    "params": self.params,
                 },
                 self.out_dir / "best.pt",
             )
@@ -274,8 +316,8 @@ class Trainer:
 @torch.no_grad()
 def evaluate_model_loader(model: nn.Module, loader: DataLoader, device: torch.device,
                           num_classes: int) -> dict:
-    """Full evaluation: predictions, probabilities, targets, timings."""
-    from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+    """Full evaluation: predictions, probabilities, targets, timings, per-class AP."""
+    from sklearn.metrics import accuracy_score, average_precision_score, precision_recall_fscore_support
 
     model.eval()
     preds, targets_all, probs_all = [], [], []
@@ -304,18 +346,37 @@ def evaluate_model_loader(model: nn.Module, loader: DataLoader, device: torch.de
     precision, recall, f1, _ = precision_recall_fscore_support(
         y_true, y_pred, labels=list(range(num_classes)), zero_division=0
     )
+
+    # One-vs-rest Average Precision per class; classes absent from y_true get nan
+    # (no positives) and are excluded from the macro average.
+    per_class_ap = []
+    for c in range(num_classes):
+        mask = y_true == c
+        if mask.sum() == 0:
+            per_class_ap.append(float("nan"))
+        elif num_classes == 1:
+            per_class_ap.append(float("nan"))
+        else:
+            binary = (y_true == c).astype(int)
+            per_class_ap.append(float(average_precision_score(binary, y_prob[:, c])))
+    valid_aps = [a for a in per_class_ap if not math.isnan(a)]
+    macro_ap = float(np.mean(valid_aps)) if valid_aps else float("nan")
+
     return {
         "n": int(len(y_true)),
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "top5_accuracy": top5_acc,
         "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
         "weighted_f1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
+        "macro_ap": macro_ap,
         "precision_macro": float(np.mean(precision)),
         "recall_macro": float(np.mean(recall)),
         "per_class_precision": precision.tolist(),
         "per_class_recall": recall.tolist(),
         "per_class_f1": f1.tolist(),
+        "per_class_ap": per_class_ap,
         "y_true": y_true.tolist(),
         "y_pred": y_pred.tolist(),
+        "y_prob": y_prob.tolist(),
         "throughput_fps": float(n_samples / max(elapsed, 1e-6)),
     }

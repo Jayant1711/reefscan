@@ -1,0 +1,17 @@
+# Kaggle profile — T4 x2 / P100.
+# Datasets go to /kaggle/tmp (ephemeral, NOT saved) so the 20 GB Output limit
+# carries only artefacts; models/results stay repo-relative for easy zipping.
+paths:
+  data_root: /kaggle/tmp/reefscan_data
+device:
+  num_workers: 2
+fish:
+  batch_size: 64
+  raw_dir: /kaggle/tmp/reefscan_data/fishnet/raw
+  data_dir: /kaggle/tmp/reefscan_data/fishnet/curated
+coral:
+  batch_size: 64
+  data_dir: /kaggle/tmp/reefscan_data/coral/imagefolders
+seg:
+  batch_size: 16
+  data_dir: /kaggle/tmp/reefscan_data/deepfish

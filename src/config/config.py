@@ -162,3 +162,19 @@ def override_from_args(cfg: DotDict, args: Any) -> DotDict:
         key, _, value = token.partition("=")
         cfg.set_nested(key.strip(), _coerce_scalar(value))
     return cfg
+
+
+def merge_config_file(cfg: DotDict, overlay_path: str | Path) -> DotDict:
+    """Deep-merge a YAML overlay (e.g. configs/platform/kaggle.yaml) into ``cfg``."""
+    overlay_path = Path(overlay_path)
+    if not overlay_path.exists():
+        raise FileNotFoundError(f"Config overlay not found: {overlay_path}")
+    with open(overlay_path, "r", encoding="utf-8") as fh:
+        overlay = yaml.safe_load(fh) or {}
+    merged = deep_merge(dict(cfg), overlay)
+    # Preserve DotDict identity: clear & refill in place.
+    for key in list(cfg.keys()):
+        cfg.pop(key)
+    for key, value in merged.items():
+        cfg[key] = DotDict.wrap(value)
+    return cfg
