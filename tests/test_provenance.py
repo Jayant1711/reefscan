@@ -100,8 +100,8 @@ def test_unfreeze_stage_all_backbones():
         model = build_model(name, num_classes=2, freeze_backbone=True)
         unfreeze_stage(model, name)  # must not raise
         assert any(p.requires_grad for n, p in model.named_parameters() if n.startswith(
-            {"resnet34": "layer4", "efficientnet_b0": "features.6",
-             "mobilenet_v3": "features.10", "convnext_tiny": "stages.3"}[name]
+            {"resnet34": "layer4", "efficientnet_b0": "features.7",
+             "mobilenet_v3": "features.12", "convnext_tiny": "features.7"}[name]
         ))
 
 

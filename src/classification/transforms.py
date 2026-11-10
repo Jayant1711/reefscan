@@ -20,9 +20,10 @@ UNDERWATER_JITTER = dict(brightness=0.30, contrast=0.30, saturation=0.30, hue=0.
 def build_train_transform(cfg: Mapping[str, Any], image_size: int) -> T.Compose:
     # ``cfg`` is either the raw augmentation dict (train.py passes section.augmentation)
     # or a task section that *contains* an ``augmentation`` key — support both.
-    aug = cfg.get("augmentation", {}) or {}
-    aug = aug.get("augmentation", aug) if isinstance(aug, Mapping) else aug
-    aug = aug or {}
+    if isinstance(cfg, Mapping) and "augmentation" in cfg:
+        aug = cfg.get("augmentation") or {}
+    else:
+        aug = (cfg or {}) if isinstance(cfg, Mapping) else {}
     return T.Compose([
         T.Resize((image_size, image_size), interpolation=InterpolationMode.BILINEAR),
         T.RandomHorizontalFlip(float(aug.get("horizontal_flip", 0.5))),

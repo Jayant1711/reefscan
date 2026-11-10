@@ -288,6 +288,8 @@ class Trainer:
     def _checkpoint_if_best(self, log: EpochLog, metrics: Mapping[str, float]) -> None:
         metric = self.cfg.metric_for_best.replace("val_", "")
         value = metrics.get(metric, log.val_weighted_f1 if "weighted_f1" in metrics else log.val_acc)
+        if not (isinstance(value, (int, float)) and value == value):  # NaN fallback chain
+            value = metrics.get("accuracy", log.train_acc)
         if value > self.best_metric:
             self.best_metric = float(value)
             self.best_epoch = log.epoch

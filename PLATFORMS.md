@@ -15,7 +15,7 @@
 %cd reefscan
 !pip install -q -r requirements.txt
 import torch; print("GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU ONLY — STOP")
-!python -m pytest tests/ -q    # verify the full suite (~60 tests) on the platform
+!python -m pytest tests/ -q    # verify the full suite (69 tests) on the platform
 ```
 
 GPU runtimes (enable BEFORE running any cell):
@@ -51,10 +51,10 @@ GPU runtimes (enable BEFORE running any cell):
 
 # 5) E3 — fish segmentation U-Net (~30 min)
 !python train.py --task seg --platform kaggle
-!python evaluate.py --task seg           # IoU / Dice / pixel-AP / box-AP50
+!python evaluate.py --task seg --platform kaggle   # IoU / Dice / pixel-AP / box-AP50
 
 # 6) SAVE — zip + record (before session ends!)
-!python evaluate.py --task coral
+!python evaluate.py --task coral --platform kaggle
 !python scripts/log_experiment.py
 !python scripts/export_artifacts.py
 ```
@@ -79,7 +79,7 @@ Download: Kaggle notebook **Output panel** → the `reefscan_artifacts_kaggle_*.
 !python train.py --task fish --model <winner> --strategy finetune --platform colab
 
 # 4) E6 — XAI + enhancement benchmark
-!python evaluate.py --task fish
+!python evaluate.py --task fish --platform colab
 !python evaluate.py --enhancement --data /content/reefscan_data/fishnet/curated/train
 !python evaluate.py --xai --image <any curated train image>
 

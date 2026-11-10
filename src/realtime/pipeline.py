@@ -176,15 +176,16 @@ class ReefScanPipeline:
         # ---- coral branch
         t0 = time.perf_counter()
         coral_result: CoralResult | None = None
-        coral_idx, coral_probs = self._predict(self.coral_model, enhanced, self.coral_img_size)
-        p_coral = float(coral_probs[coral_idx])
-        p_bleached = (
-            float(coral_probs[self.coral_classes.index("CORAL_BL")])
-            if "CORAL_BL" in self.coral_classes
-            else 1.0 - p_coral
-        )
-        assessment = self.assessor.assess(enhanced, p_bleached)
-        coral_result = CoralResult(assessment=assessment, is_coral_scene=p_coral >= 0.5, p_coral=p_coral)
+        if self.coral_model is not None:
+            coral_idx, coral_probs = self._predict(self.coral_model, enhanced, self.coral_img_size)
+            p_coral = float(coral_probs[coral_idx])
+            p_bleached = (
+                float(coral_probs[self.coral_classes.index("CORAL_BL")])
+                if "CORAL_BL" in self.coral_classes
+                else 1.0 - p_coral
+            )
+            assessment = self.assessor.assess(enhanced, p_bleached)
+            coral_result = CoralResult(assessment=assessment, is_coral_scene=p_coral >= 0.5, p_coral=p_coral)
         timings["coral"] = time.perf_counter() - t0
 
         # ---- fish branch
@@ -213,6 +214,8 @@ class ReefScanPipeline:
         for i, box in enumerate(boxes):
             crop = enhanced[max(0, box.y1):box.y2, max(0, box.x1):box.x2]
             if crop.size == 0:
+                continue
+            if self.fish_model is None:
                 continue
             idx, probs = self._predict(self.fish_model, crop, self.fish_img_size)
             det = FishDetection(box=box, species=self.fish_classes[idx], confidence=float(probs[idx]))

@@ -34,6 +34,10 @@ def page_analytics(cfg) -> None:
         uploaded = uploaded[:40]
 
     pipeline = get_pipeline(enable_cam=False)
+    if pipeline.fish_model is None:
+        st.error("No trained fish model found — run `python run_smoke_test.py` (demo) or "
+                     "`python train.py --task fish` first.", icon="🚨")
+        return
     analyses, source_images = [], []
     progress = st.progress(0.0, text="Analysing images ...")
     for i, up in enumerate(uploaded):

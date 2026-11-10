@@ -31,6 +31,10 @@ def page_species(cfg) -> None:
 
     with st.spinner("Analysing ..."):
         pipeline = get_pipeline(enable_cam=False)
+    if pipeline.fish_model is None:
+        st.error("No trained fish model found — run `python run_smoke_test.py` (demo) or "
+                     "`python train.py --task fish` first.", icon="🚨")
+        return
         analysis = pipeline.analyze_image(image)
         heatmap = None
         if show_heatmap and analysis.detections:

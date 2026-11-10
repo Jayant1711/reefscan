@@ -92,6 +92,8 @@ def download_fishnet(
 
     sentinel = raw_dir / "_EXTRACTED"
     if sentinel.exists():
+        if not extracted.exists() or not any(extracted.iterdir()):
+            extracted = raw_dir  # flat archive layout
         logger.info("FishNet already extracted at %s — skipping.", extracted)
         return extracted
 

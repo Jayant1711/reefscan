@@ -31,6 +31,10 @@ def page_coral(cfg) -> None:
 
     with st.spinner("Assessing coral condition ..."):
         pipeline = get_pipeline(enable_cam=False)
+    if pipeline.coral_model is None:
+        st.error("No trained coral model found — run `python run_smoke_test.py` (demo) or "
+                     "`python train.py --task coral` first.", icon="🚨")
+        return
         analysis = pipeline.analyze_image(image)
 
     if analysis.coral is None:

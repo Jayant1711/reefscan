@@ -25,14 +25,17 @@ SPLIT_DIRS = {"train": "train", "validation": "validation", "test": "test"}
 
 
 def _imagefolder_ready(root: Path, min_images: int = 100) -> bool:
-    # A _COMPLETE marker is written only after every split has been materialised,
-    # so an interrupted download is never mistaken for a ready dataset.
-    if not (root.parent / "_COMPLETE").exists():
-        return False
+    # A _COMPLETE marker is written after every split is materialised, so an
+    # interrupted download is never mistaken for a ready dataset. Datasets
+    # created before markers existed are healed in place.
     if not root.exists():
         return False
     total = sum(1 for _ in root.rglob("*.jpg")) + sum(1 for _ in root.rglob("*.png"))
-    return total >= min_images
+    if total < min_images:
+        return False
+    if not (root.parent / "_COMPLETE").exists():
+        (root.parent / "_COMPLETE").write_text("ok\n", encoding="utf-8")
+    return True
 
 
 def _save_via_datasets(root: Path) -> Path:

@@ -38,6 +38,10 @@ def page_xai(cfg) -> None:
     image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
     pipeline = get_pipeline(enable_cam=False)
+    if pipeline.fish_model is None:
+        st.error("No trained fish model found — run `python run_smoke_test.py` (demo) or "
+                     "`python train.py --task fish` first.", icon="🚨")
+        return
     analysis = pipeline.analyze_image(image)
     if not analysis.detections:
         st.warning("No fish region found — explaining the whole-frame prediction instead.")

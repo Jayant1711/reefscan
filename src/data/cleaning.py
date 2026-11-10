@@ -148,7 +148,7 @@ def scan_imagefolder(root: str | Path, min_size: int = MIN_IMAGE_SIZE) -> dict:
         "scanned": report["scanned"],
         "corrupt": len(report["corrupt"]),
         "too_small": len(report["too_small"]),
-        "duplicate_images": sum(len(g["paths"]) - 1 for g in report["duplicate_groups"]),
+        "duplicate_images": len({p for g in report["duplicate_groups"] for p in g["paths"][1:]}),
         "leaked_images": sum(len(g["paths"]) - 1 for g in report["leakage_groups"]),
     }
     logger.info("Scan %s: %s", root.name, report["counts"])

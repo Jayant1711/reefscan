@@ -45,13 +45,15 @@ SETUP_COMMON = f"""# --- 0. Clone the repo + install dependencies --------------
 !pip install -q -r requirements.txt
 
 import os
-os.chdir("REPO_DIR")  # keeps later cells working even after a kernel restart"""
+if os.path.basename(os.getcwd()) != os.path.basename("REPO_DIR"):
+    os.chdir("REPO_DIR")  # kernel restarts land elsewhere — re-enter the repo"""
 
 GPU_CHECK = """# --- 1. GPU + test-suite check (fails loudly if anything is broken) --------
-import torch, sys
+import torch, subprocess, sys
 assert torch.cuda.is_available(), "NO GPU — enable the accelerator and re-run!"
 print("GPU:", torch.cuda.get_device_name(0))
-!python -m pytest tests/ -q
+r = subprocess.run([sys.executable, "-m", "pytest", "tests/", "-q"])
+assert r.returncode == 0, "TEST SUITE FAILED — fix before training (do not skip!)"
 """
 
 EXPORT_COLAB = """# --- 9. Save everything: ledger + artifact zip + BROWSER DOWNLOAD ----------
@@ -102,6 +104,7 @@ pd.read_csv("results/coral/model_leaderboard.csv")"""),
 import pandas as pd, subprocess, sys
 lb = pd.read_csv("results/coral/model_leaderboard.csv")
 fe = lb[lb["strategy"] == "feature_extraction"]
+assert len(fe) == 4, f"FE screen incomplete: {len(fe)}/4 backbones have metrics"
 top2 = fe.nlargest(2, "weighted_f1")["model"].tolist()
 print("Fine-tuning top-2 from the FE screen:", top2)
 for model in top2:
@@ -110,11 +113,11 @@ for model in top2:
 # Optional middle ground on the overall winner:
 subprocess.run([sys.executable, "train.py", "--task", "coral", "--model", top2[0],
                 "--strategy", "partial_finetune", "--platform", "kaggle"], check=True)
-!python evaluate.py --task coral
+!python evaluate.py --task coral --platform kaggle
 pd.read_csv("results/coral/model_leaderboard.csv")"""),
         code("""# --- 6. E3 — fish segmentation U-Net (~30 min) + IoU/Dice/AP metrics -------
 !python train.py --task seg --platform kaggle
-!python evaluate.py --task seg
+!python evaluate.py --task seg --platform kaggle
 import json; print(json.dumps(json.load(open("results/seg/metrics.json")), indent=2))"""),
         code("""# --- 7. XAI sanity check on the best coral model (Phase-3 innovation) -------
 import glob
@@ -161,7 +164,7 @@ winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
 print("Fine-tuning FE-screen winner:", winner)
 subprocess.run([sys.executable, "train.py", "--task", "fish", "--model", winner,
                 "--strategy", "finetune", "--platform", "colab"], check=True)
-!python evaluate.py --task fish
+!python evaluate.py --task fish --platform colab
 pd.read_csv("results/fish/model_leaderboard.csv")"""),
         code("""# --- 6. E6 — XAI grid + enhancement benchmark on real data ------------------
 import glob

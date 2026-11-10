@@ -33,18 +33,7 @@ class SurveyAnalytics:
     coral_risk_score: float
     coral_risk_category: str
     bleached_frame_fraction: float
-
-    def _condition_distribution(self, history: list[float]) -> dict[str, float]:
-        """Proxy severity classes from the per-frame BSI history."""
-        from collections import Counter
-
-        from ..coral_analysis.severity import index_to_class_strict
-
-        thresholds = tuple(self.cfg.coral.severity.thresholds) if self.cfg else (15, 35, 60, 85)
-        counts = Counter(index_to_class_strict(v, thresholds) for v in history)
-        total = sum(counts.values()) or 1
-        return {c: counts.get(c, 0) / total for c in
-                ("healthy", "mild", "moderate", "severe", "dead")}
+    condition_distribution: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -99,6 +88,18 @@ class SurveyAnalyzer:
         self.rh_weights = dict(getattr(a, "reef_health_weights", {"severity": 0.6, "bleached_frac": 0.25, "risk": 0.15}))
         self.rare_pct = float(getattr(a, "rare_species_pct", 1.0))
 
+    def _condition_distribution(self, history: list[float]) -> dict[str, float]:
+        """Proxy severity classes from the per-frame BSI history."""
+        from collections import Counter
+
+        from ..coral_analysis.severity import index_to_class_strict
+
+        thresholds = tuple(self.cfg.coral.severity.thresholds) if self.cfg else (15, 35, 60, 85)
+        counts = Counter(index_to_class_strict(v, thresholds) for v in history)
+        total = sum(counts.values()) or 1
+        return {c: counts.get(c, 0) / total for c in
+                ("healthy", "mild", "moderate", "severe", "dead")}
+
     def analyze(self, analyses: Sequence[FrameAnalysis], source_images: Sequence[np.ndarray] | None = None) -> SurveyAnalytics:
         if not analyses:
             raise ValueError("SurveyAnalyzer needs at least one FrameAnalysis.")
@@ -145,4 +146,5 @@ class SurveyAnalyzer:
             coral_risk_score=coral_risk.score,
             coral_risk_category=coral_risk.category,
             bleached_frame_fraction=bleached_frac,
+            condition_distribution=self._condition_distribution(trend.history),
         )

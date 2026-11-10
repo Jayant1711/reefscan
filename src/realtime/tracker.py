@@ -39,17 +39,15 @@ class CentroidTracker:
     def update(self, detections: list[BBox], frame_idx: int = 0,
                species_by_box: list[tuple[str, float]] | None = None) -> list[Track]:
         """Update tracks from current detections; returns live tracks."""
+        # Age existing tracks (detection-free stretches must also count down).
+        for track in self.tracks.values():
+            track.disappeared += 1
+
         if not detections:
-            # Age + retire stale tracks even on empty frames, then return.
             self._drop_stale()
             return list(self.tracks.values())
 
         centroids = [(d.cx, d.cy) for d in detections]
-
-        # Age existing tracks.
-        for track in self.tracks.values():
-            track.disappeared += 1
-
         unmatched_dets = set(range(len(centroids)))
         if self.tracks:
             track_ids = list(self.tracks.keys())
