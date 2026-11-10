@@ -36,7 +36,17 @@ def download_deepfish(data_dir: str | Path, keep_archive: bool = False) -> Path:
     with tarfile.open(tar_path, "r") as tf:
         try:
             tf.extractall(data_dir, filter="data")  # py3.12+: no deprecation, safe members
-        except TypeError:  # py<3.11.4 has no filter kwarg
+        except TypeError:
+            # py<3.11.4: no filter kwarg — validate members manually (no absolute
+            # paths, no '..' parts, no links) before the vulnerable extractall.
+            unsafe = [
+                m for m in tf.getmembers()
+                if m.issym() or m.islnk()
+                or m.name.startswith(("/", "\\"))
+                or ".." in m.name.replace("\\", "/").split("/")
+            ]
+            if unsafe:
+                raise RuntimeError(f"Unsafe tar members: {[u.name for u in unsafe[:5]]}")
             tf.extractall(data_dir)
     sentinel.write_text("ok\n", encoding="utf-8")  # marks a COMPLETE extraction
 

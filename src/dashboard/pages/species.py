@@ -33,19 +33,18 @@ def page_species(cfg) -> None:
         pipeline = get_pipeline(enable_cam=False)
     if pipeline.fish_model is None:
         st.error("No trained fish model found — run `python run_smoke_test.py` (demo) or "
-                     "`python train.py --task fish` first.", icon="🚨")
+                 "`python train.py --task fish` first.", icon="🚨")
         return
-        analysis = pipeline.analyze_image(image)
-        heatmap = None
-        if show_heatmap and analysis.detections:
-            from ...explainability.cam import GradCAM
-            from ...explainability.targets import find_target_layer
-            from ...explainability.visualize import overlay_cam_on_image
+    analysis = pipeline.analyze_image(image)
+    heatmap = None
+    if show_heatmap and analysis.detections:
+        from ...explainability.cam import GradCAM
+        from ...explainability.targets import find_target_layer
 
-            with GradCAM(pipeline.fish_model, find_target_layer(pipeline.fish_model)) as cam:
-                tensor = pipeline._preprocess(analysis.enhanced, pipeline.fish_img_size)
-                heatmap = cam.generate(tensor)
-            heatmap = cv2.resize(heatmap, (image.shape[1], image.shape[0]))
+        with GradCAM(pipeline.fish_model, find_target_layer(pipeline.fish_model)) as cam:
+            tensor = pipeline._preprocess(analysis.enhanced, pipeline.fish_img_size)
+            heatmap = cam.generate(tensor)
+        heatmap = cv2.resize(heatmap, (image.shape[1], image.shape[0]))
 
     annotated = annotate_frame(image, analysis.detections,
                                analysis.coral.assessment if analysis.coral else None,

@@ -217,7 +217,7 @@ class Trainer:
         # Restore best weights for downstream evaluation.
         best_path = self.out_dir / "best.pt"
         if best_path.exists():
-            ckpt = torch.load(best_path, map_location=self.device, weights_only=False)
+            ckpt = torch.load(best_path, map_location=self.device, weights_only=True)
             self.model.load_state_dict(ckpt["model"])
             logger.info("Restored best weights from epoch %d.", ckpt.get("epoch", -1))
         return self.history
@@ -308,6 +308,7 @@ class Trainer:
             )
             torch.save(
                 {
+                    "ckpt_version": 1,
                     "model": self.model.state_dict(),
                     "model_name": self.model_name,
                     "num_classes": len(self.class_names),

@@ -155,4 +155,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from src.utils.cli import run_cli
+
+    raise SystemExit(run_cli(main))

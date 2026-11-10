@@ -14,6 +14,13 @@ from pathlib import Path
 
 import torch
 
+try:
+    import onnx  # noqa: F401
+except ImportError as _exc:
+    raise SystemExit(
+        'ONNX extras missing — install with: pip install onnx onnxscript onnxruntime'
+    ) from _exc
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.classification.models import build_model  # noqa: E402
@@ -32,7 +39,7 @@ def main() -> int:
     if not ckpt_path.exists():
         raise FileNotFoundError(f"{ckpt_path} not found — train the model first.")
 
-    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=True)
     model = build_model(ckpt["model_name"], ckpt["num_classes"], pretrained=False)
     model.load_state_dict(ckpt["model"])
     model.eval()
@@ -61,4 +68,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from src.utils.cli import run_cli
+
+    raise SystemExit(run_cli(main))

@@ -30,15 +30,15 @@ def page_realtime(cfg) -> None:
 
     if st.button("🚀 Run analysis", type="primary", use_container_width=True):
         tmp_dir = Path(tempfile.mkdtemp(prefix="reefscan_"))
-        src = tmp_dir / uploaded.name
+        src = tmp_dir / Path(uploaded.name).name  # sanitize client-controlled name
         src.write_bytes(uploaded.getvalue())
         out_path = tmp_dir / "annotated.mp4"
 
         pipeline = get_pipeline(enable_cam=False)
-    if pipeline.fish_model is None:
-        st.error("No trained fish model found — run `python run_smoke_test.py` (demo) or "
+        if pipeline.fish_model is None:
+            st.error("No trained fish model found — run `python run_smoke_test.py` (demo) or "
                      "`python train.py --task fish` first.", icon="🚨")
-        return
+            return
         pipeline.cfg.realtime.frame_skip = frame_skip
         pipeline.cfg.realtime.max_frames = int(max_frames)
 

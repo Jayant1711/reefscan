@@ -15,7 +15,7 @@
 %cd reefscan
 !pip install -q -r requirements.txt
 import torch; print("GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU ONLY — STOP")
-!python -m pytest tests/ -q    # verify the full suite (69 tests) on the platform
+!python -m pytest tests/ -q    # verify the full suite (80 tests) on the platform
 ```
 
 GPU runtimes (enable BEFORE running any cell):
@@ -42,7 +42,7 @@ GPU runtimes (enable BEFORE running any cell):
 !python clean_data.py --dataset coral --apply --platform kaggle
 !python clean_data.py --dataset seg --apply --platform kaggle
 
-# 3) E1 — coral FE screen (all 4 backbones, frozen backbone, ~35 min on T4×2)
+# 3) E1 — coral FE screen (all 4 backbones, frozen backbone, ~35 min on a T4)
 !python train.py --task coral --model all --strategy feature_extraction --platform kaggle
 
 # 4) E2 — coral fine-tune top-2 (pick from results/coral/model_leaderboard.csv)

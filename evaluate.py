@@ -79,7 +79,7 @@ def run_task_evaluation(cfg, task: str, model: str | None, device) -> None:
     for name in names:
         import torch
 
-        ckpt = torch.load(models_dir / name / "best.pt", map_location="cpu", weights_only=False)
+        ckpt = torch.load(models_dir / name / "best.pt", map_location="cpu", weights_only=True)
         class_names = ckpt.get("class_names")
         run_model_evaluation(
             task_name=task, model_name=name, data_dir=Path(section.data_dir),
@@ -177,4 +177,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from src.utils.cli import run_cli
+
+    raise SystemExit(run_cli(main))

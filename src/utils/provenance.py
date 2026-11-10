@@ -66,6 +66,20 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def env_versions() -> dict:
+    """Runtime versions a reproducer needs (python/torch/cuda)."""
+    import sys
+
+    try:
+        import torch
+
+        torch_version = torch.__version__
+        cuda_version = torch.version.cuda or "cpu-build"
+    except Exception:  # pragma: no cover
+        torch_version, cuda_version = "unknown", "unknown"
+    return {"python": sys.version.split()[0], "torch": torch_version, "cuda": cuda_version}
+
+
 def build_manifest(
     *,
     task: str,
@@ -79,18 +93,23 @@ def build_manifest(
     final_metrics: dict,
     artifacts: dict[str, str] | None = None,
     project_root: str | Path | None = None,
+    seed: int | None = None,
+    dataset_summary: dict | None = None,
 ) -> dict:
     """Assemble the canonical per-run manifest written to ``runs/<task>/...``."""
     return {
-        "schema": "reefscan-run-manifest-v1",
+        "schema": "reefscan-run-manifest-v2",
         "recorded_at": utc_now_iso(),
         "git_sha": git_sha(project_root),
         "platform": detect_platform(),
         "gpu": gpu_name(),
+        "env": env_versions(),
+        "seed": seed,
         "task": task,
         "model": model_name,
         "strategy": strategy,
         "dataset": dataset,
+        "dataset_summary": dataset_summary or {},
         "config": config_snapshot,
         "params": params,
         "train_seconds": round(float(train_seconds), 1),

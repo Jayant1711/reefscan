@@ -258,7 +258,7 @@ def run_xai(cfg, device) -> None:
     from src.utils import read_image_bgr
 
     ckpt = torch.load(PROJECT_ROOT / "models/demo/fish/mobilenet_v3/best.pt",
-                      map_location=device, weights_only=False)
+                      map_location=device, weights_only=True)
     model = build_model(ckpt["model_name"], ckpt["num_classes"], pretrained=False)
     model.load_state_dict(ckpt["model"])
     model.to(device).eval()

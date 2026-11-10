@@ -33,6 +33,10 @@ from dataclasses import dataclass, field
 SEVERITY_CLASSES = ["healthy", "mild", "moderate", "severe", "dead"]
 SEVERITY_WEIGHTS = {"healthy": 0, "mild": 25, "moderate": 50, "severe": 75, "dead": 100}
 
+# Single source for the default WGBS class cut-offs (mirrors configs/default.yaml
+# coral.severity.thresholds; a pinning test keeps the two in sync).
+DEFAULT_THRESHOLDS = (15, 35, 60, 85)
+
 
 def whiteness_ratio(image_bgr: np.ndarray, s_max: int = 70, v_min: int = 140) -> float:
     """Fraction of pale-bright pixels (bleached tissue proxy) in [0, 1].
@@ -63,7 +67,7 @@ def severity_index(p_bleached: float, whiteness: float, fusion_lambda: float = 0
     return 100.0 * (lam * p + (1.0 - lam) * w)
 
 
-def index_to_class(index: float, thresholds: tuple[float, ...] = (15, 35, 60, 85)) -> str:
+def index_to_class(index: float, thresholds: tuple[float, ...] = DEFAULT_THRESHOLDS) -> str:
     """Map a continuous severity index to one of the 5 ordinal classes."""
     if index < thresholds[0]:
         return "healthy"
@@ -76,7 +80,7 @@ def index_to_class(index: float, thresholds: tuple[float, ...] = (15, 35, 60, 85
     return "dead"
 
 
-def index_to_class_strict(index: float, thresholds: tuple[float, ...] = (15, 35, 60, 85)) -> str:
+def index_to_class_strict(index: float, thresholds: tuple[float, ...] = DEFAULT_THRESHOLDS) -> str:
     """Explicit (readable) threshold walk for reports and tests."""
     if index < thresholds[0]:
         return "healthy"

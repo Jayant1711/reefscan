@@ -75,7 +75,7 @@ def load_best_classifier(
             candidates.append(demo_ckpt)
 
     for ckpt_path in candidates:
-        ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
         class_names = ckpt.get("class_names") or [f"class_{i}" for i in range(ckpt.get("num_classes", 2))]
         model = build_model(ckpt["model_name"], len(class_names), pretrained=False)
         model.load_state_dict(ckpt["model"])
@@ -95,7 +95,7 @@ def load_segmenter(models_dir: str | Path, device: torch.device) -> SmallUNet | 
     if not ckpt_path.exists():
         logger.info("No segmentation checkpoint (%s) — fish boxes disabled.", ckpt_path)
         return None
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
     model = SmallUNet()
     model.load_state_dict(ckpt["model"])
     model.to(device).eval()
@@ -127,12 +127,15 @@ class ReefScanPipeline:
         self.enhancer, self.enhancer_name = load_best_enhancer(cfg.paths.results_dir, params)
         logger.info("Enhancement strategy: %s", self.enhancer_name)
 
-        self.fish_model, self.fish_classes, self.fish_src, self.fish_img_size = load_best_classifier(
-            "fish", cfg.paths.models_dir, self.device, cfg.paths.demo_dir
-        )
-        self.coral_model, self.coral_classes, self.coral_src, self.coral_img_size = load_best_classifier(
-            "coral", cfg.paths.models_dir, self.device, cfg.paths.demo_dir
-        )
+        def _load_or_none(task: str):
+            try:
+                return load_best_classifier(task, cfg.paths.models_dir, self.device, cfg.paths.demo_dir)
+            except FileNotFoundError as exc:
+                logger.warning("%s classifier unavailable: %s", task, exc)
+                return None, [], "missing", 224
+
+        self.fish_model, self.fish_classes, self.fish_src, self.fish_img_size = _load_or_none("fish")
+        self.coral_model, self.coral_classes, self.coral_src, self.coral_img_size = _load_or_none("coral")
         self.segmenter = load_segmenter(cfg.paths.models_dir, self.device)
 
         sev = cfg.coral.severity
@@ -142,7 +145,10 @@ class ReefScanPipeline:
             s_max=sev.whiteness_s_max,
             v_min=sev.whiteness_v_min,
         )
-        self._cam: GradCAM | None = GradCAM(self.fish_model, find_target_layer(self.fish_model)) if enable_cam else None
+        self._cam: GradCAM | None = (
+            GradCAM(self.fish_model, find_target_layer(self.fish_model))
+            if enable_cam and self.fish_model is not None else None
+        )
 
         self.normalize = T.Normalize(IMAGENET_MEAN, IMAGENET_STD)
         self.tracker = CentroidTracker(
@@ -170,6 +176,13 @@ class ReefScanPipeline:
         timings: dict[str, float] = {}
 
         t0 = time.perf_counter()
+        if track and self.cfg.realtime.get("tracker_enabled", True):
+            # Dashboard singleton is process-wide: reset per analysis so
+            # concurrent sessions cannot bleed track IDs into each other.
+            self.tracker = CentroidTracker(
+                max_disappeared=self.cfg.realtime.tracker_max_disappeared,
+                min_distance=self.cfg.realtime.tracker_min_distance,
+            )
         enhanced = self.enhancer.enhance(image_bgr) if self.cfg.enhancement.enabled else image_bgr
         timings["enhance"] = time.perf_counter() - t0
 

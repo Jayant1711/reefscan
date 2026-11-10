@@ -42,7 +42,7 @@ def evaluate_segmentation(
     if not ckpt_path.exists():
         raise FileNotFoundError(f"No segmentation checkpoint at {ckpt_path} — train seg first.")
 
-    bundle = torch.load(ckpt_path, map_location=device, weights_only=False)
+    bundle = torch.load(ckpt_path, map_location=device, weights_only=True)
     model = SmallUNet().to(device)
     model.load_state_dict(bundle["model"])
     model.eval()

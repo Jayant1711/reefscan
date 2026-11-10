@@ -32,7 +32,7 @@ docker run -p 8501:8501 -v $(pwd)/models:/app/models reefscan
 - `torch.set_num_threads(k)` — cap threads (config `device.num_threads`).
 - MobileNetV3-Small is the default CPU champion (~4× faster than ResNet34 at similar accuracy on small sets).
 - Video: `realtime.frame_skip: 2` halves cost with negligible counting drift (tracker bridges gaps).
-- Optional ONNX export for ~1.5–2.5× CPU speedup:
+- Optional ONNX export for ~often ~2× (benchmark-dependent) CPU speedup:
 ```python
 python scripts/export_onnx.py --task fish --model mobilenet_v3   # models/fish/mobilenet_v3/best.onnx
 ```

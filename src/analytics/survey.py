@@ -92,9 +92,9 @@ class SurveyAnalyzer:
         """Proxy severity classes from the per-frame BSI history."""
         from collections import Counter
 
-        from ..coral_analysis.severity import index_to_class_strict
+        from ..coral_analysis.severity import DEFAULT_THRESHOLDS, index_to_class_strict
 
-        thresholds = tuple(self.cfg.coral.severity.thresholds) if self.cfg else (15, 35, 60, 85)
+        thresholds = tuple(self.cfg.coral.severity.thresholds) if self.cfg else DEFAULT_THRESHOLDS
         counts = Counter(index_to_class_strict(v, thresholds) for v in history)
         total = sum(counts.values()) or 1
         return {c: counts.get(c, 0) / total for c in

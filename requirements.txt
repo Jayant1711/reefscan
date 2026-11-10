@@ -37,3 +37,8 @@ tabulate>=0.9             # FishNet Google Drive download
 
 # --- Dev / tests ---
 pytest>=7.4
+
+# --- optional: ONNX export/deployment (python scripts/export_onnx.py) ---
+onnx>=1.15
+onnxscript
+onnxruntime>=1.16

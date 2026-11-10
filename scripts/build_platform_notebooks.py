@@ -92,7 +92,7 @@ def kaggle_cells() -> list[dict]:
            "Runs the **coral bleaching** experiment matrix (feature-extraction screen → "
            "fine-tune the top-2) plus **fish segmentation**, fully automatically.\n\n"
            "**Before Run All:** right sidebar → *Session options* → **Accelerator: GPU T4 x2** "
-           "and **Internet: On**. Duration ≈ 1.5–2.5 h on two T4s. "
+           "and **Internet: On**. Duration ≈ 1.5–2.5 h on a T4. "
            "At the end the artifact zip appears in the **Output panel** — download it."),
         code(setup),
         code(GPU_CHECK),
@@ -110,12 +110,19 @@ pd.read_csv("results/coral/model_leaderboard.csv")"""),
 import pandas as pd, subprocess, sys
 lb = pd.read_csv("results/coral/model_leaderboard.csv")
 fe = lb[lb["strategy"] == "feature_extraction"]
-assert len(fe) == 4, f"FE screen incomplete: {len(fe)}/4 backbones have metrics"
+assert len(fe) >= 2, f"FE screen has only {len(fe)}/4 backbones with metrics - cannot pick top-2"
+if len(fe) < 4:
+    print(f"WARNING: FE screen incomplete ({len(fe)}/4) - proceeding with available backbones")
 top2 = fe.nlargest(2, "weighted_f1")["model"].tolist()
 print("Fine-tuning top-2 from the FE screen:", top2)
+ft_failures = []
 for model in top2:
-    subprocess.run([sys.executable, "train.py", "--task", "coral", "--model", model,
-                    "--strategy", "finetune", "--platform", "kaggle"], check=True)
+    r = subprocess.run([sys.executable, "train.py", "--task", "coral", "--model", model,
+                        "--strategy", "finetune", "--platform", "kaggle"])
+    if r.returncode != 0:
+        ft_failures.append(model)
+        print(f"WARNING: fine-tune failed for {model} - continuing")
+print("Fine-tune failures:", ft_failures or "none")
 # Optional middle ground on the overall winner:
 subprocess.run([sys.executable, "train.py", "--task", "coral", "--model", top2[0],
                 "--strategy", "partial_finetune", "--platform", "kaggle"], check=True)
@@ -126,11 +133,11 @@ pd.read_csv("results/coral/model_leaderboard.csv")"""),
 !python evaluate.py --task seg --platform kaggle
 import json; print(json.dumps(json.load(open("results/seg/metrics.json")), indent=2))"""),
         code("""# --- 7. XAI sanity check on the best coral model (Phase-3 innovation) -------
-import glob
+import glob, shlex
 sample = (glob.glob("/kaggle/tmp/reefscan_data/coral/imagefolders/test/*/*.jpg") +
           glob.glob("datasets/coral/imagefolders/test/*/*.jpg"))
 if sample:
-    !python evaluate.py --xai --xai-task coral --image {sample[0]}
+    !python evaluate.py --xai --xai-task coral --image {shlex.quote(str(sample[0]))}
 else:
     print("No coral test images found — skipping XAI (not fatal).")"""),
         code(EXPORT_KAGGLE),
@@ -168,16 +175,21 @@ lb = pd.read_csv("results/fish/model_leaderboard.csv")
 fe = lb[lb["strategy"] == "feature_extraction"]
 winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
 print("Fine-tuning FE-screen winner:", winner)
-subprocess.run([sys.executable, "train.py", "--task", "fish", "--model", winner,
-                "--strategy", "finetune", "--platform", "colab"], check=True)
+r = subprocess.run([sys.executable, "train.py", "--task", "fish", "--model", winner,
+                    "--strategy", "finetune", "--platform", "colab"])
+if r.returncode != 0:
+    print(f"WARNING: fine-tune failed for {winner} - evaluation below uses the FE checkpoint")
 !python evaluate.py --task fish --platform colab
 pd.read_csv("results/fish/model_leaderboard.csv")"""),
         code("""# --- 6. E6 — XAI grid + enhancement benchmark on real data ------------------
-import glob
-sample = (glob.glob("/content/reefscan_data/fishnet/curated/test/*/*.jpg") or
-          glob.glob("/content/reefscan_data/fishnet/curated/train/*/*.jpg"))[0]
+import glob, shlex
+samples = (glob.glob("/content/reefscan_data/fishnet/curated/test/*/*.jpg") or
+           glob.glob("/content/reefscan_data/fishnet/curated/train/*/*.jpg"))
 !python evaluate.py --enhancement --data /content/reefscan_data/fishnet/curated/train
-!python evaluate.py --xai --image {sample} || true"""),
+if samples:
+    !python evaluate.py --xai --image {shlex.quote(str(samples[0]))}
+else:
+    print("No curated fish images found — skipping XAI (not fatal).")"""),
         code(EXPORT_COLAB),
     ]
 

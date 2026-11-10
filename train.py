@@ -35,6 +35,12 @@ from src.utils.provenance import build_manifest, count_params, detect_platform, 
 from src.utils.seed import seed_everything
 
 logger = logging.getLogger("train")
+_CLI_ARGS: argparse.Namespace | None = None
+
+
+def args_like() -> argparse.Namespace:
+    """Module-level access to parsed CLI args (for --continue inside helpers)."""
+    return _CLI_ARGS if _CLI_ARGS is not None else argparse.Namespace(continue_run=False)
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,6 +55,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default=None, help="Path to YAML config")
     parser.add_argument("--set", nargs="*", default=[], help="Config overrides: section.key=value")
     parser.add_argument("--quick", action="store_true", help="Tiny fast run (CPU smoke test)")
+    parser.add_argument("--continue", dest="continue_run", action="store_true",
+                        help="Skip runs whose runs/<task>/<model>_<strategy>/manifest.json already exists")
     return parser.parse_args()
 
 
@@ -65,7 +73,8 @@ def apply_quick(cfg, task: str) -> None:
 
 
 def _write_manifest(cfg, task: str, model_name: str, strategy: str, train_seconds: float,
-                    epochs_ran: int, final_metrics: dict, params: dict) -> Path:
+                    epochs_ran: int, final_metrics: dict, params: dict,
+                    dataset_summary: dict | None = None) -> Path:
     """Write runs/<task>/<model>_<strategy>/manifest.json and return its path."""
     section = cfg[task]
     manifest = build_manifest(
@@ -73,16 +82,7 @@ def _write_manifest(cfg, task: str, model_name: str, strategy: str, train_second
         model_name=model_name,
         strategy=strategy,
         dataset=str(section.get("data_dir", "")),
-        config_snapshot={
-            "image_size": section.get("image_size"),
-            "batch_size": section.get("batch_size"),
-            "epochs": section.get("epochs"),
-            "lr": section.get("lr"),
-            "optimizer": section.get("optimizer"),
-            "scheduler": section.get("scheduler"),
-            "early_stopping": section.get("early_stopping"),
-            "metric_for_best": section.get("metric_for_best"),
-        },
+        config_snapshot={k: v for k, v in section.items() if k != "augmentation"},
         params=params,
         train_seconds=train_seconds,
         epochs_ran=epochs_ran,
@@ -93,6 +93,8 @@ def _write_manifest(cfg, task: str, model_name: str, strategy: str, train_second
             "leaderboard": str(Path(cfg.paths.results_dir) / task / "model_leaderboard.csv"),
         },
         project_root=Path(__file__).resolve().parent,
+        seed=cfg.project.get("seed", 42),
+        dataset_summary=dataset_summary,
     )
     manifest_dir = ensure_dir(Path(cfg.paths.results_dir).parent / "runs" / task / f"{model_name}_{strategy}")
     manifest_path = manifest_dir / "manifest.json"
@@ -139,6 +141,14 @@ def train_classifier(task: str, model_name: str, cfg, device: torch.device,
     if strategy_override:
         train_cfg.strategy = strategy_override
 
+    manifest_path = (Path(cfg.paths.results_dir).parent / "runs" / task /
+                     f"{model_name}_{(strategy_override or section.get('strategy', 'finetune'))}" /
+                     "manifest.json")
+    if getattr(args_like(), "continue_run", False) and manifest_path.exists():
+        logger.info("Skipping %s/%s — manifest exists at %s (--continue).",
+                    task, model_name, manifest_path)
+        return None
+
     out_dir = ensure_dir(Path(cfg.paths.models_dir) / task / model_name)
     trainer = Trainer(
         model_name=model_name,
@@ -179,6 +189,13 @@ def train_classifier(task: str, model_name: str, cfg, device: torch.device,
         final_metrics={k: v for k, v in metrics.items()
                        if isinstance(v, (int, float)) and k != "n"},
         params=trainer.params,
+        dataset_summary={
+            "num_classes": bundle.num_classes,
+            "class_counts": dict(bundle.class_counts),
+            "n_train": len(bundle.train.dataset),
+            "n_val": len(bundle.val.dataset) if bundle.val else 0,
+            "n_test": len(bundle.test.dataset) if bundle.test else 0,
+        },
     )
 
 
@@ -215,7 +232,9 @@ def train_segmentation(cfg, device: torch.device) -> None:
 
 
 def main() -> int:
+    global _CLI_ARGS
     args = parse_args()
+    _CLI_ARGS = args
     cfg = load_config(args.config)
     if args.platform:
         overlay = Path(__file__).resolve().parent / "configs" / "platform" / f"{args.platform}.yaml"
@@ -247,10 +266,25 @@ def main() -> int:
         return 0
 
     models = SUPPORTED_MODELS if args.model == "all" else [args.model]
+    failures: list[str] = []
     for model_name in models:
         logger.info("=== Training %s / %s (%s) ===",
                     args.task, model_name, cfg[args.task].get("strategy", "finetune"))
-        train_classifier(args.task, model_name, cfg, device)
+        try:
+            train_classifier(args.task, model_name, cfg, device, strategy_override=args.strategy)
+        except torch.cuda.OutOfMemoryError as exc:
+            torch.cuda.empty_cache()
+            failures.append(f"{model_name}: CUDA OOM ({exc}) — retry with "
+                            f"--set {args.task}.batch_size=16")
+            logger.error("OOM on %s — continuing with remaining backbones.", model_name)
+        except Exception as exc:  # noqa: BLE001 — one backbone must not kill the screen
+            failures.append(f"{model_name}: {type(exc).__name__}: {exc}")
+            logger.exception("Backbone %s failed — continuing.", model_name)
+
+    if failures and len(failures) == len(models):
+        raise RuntimeError("All backbones failed:\n" + "\n".join(failures))
+    for failure in failures:
+        logger.warning("FAILED backbone: %s", failure)
 
     logger.info("Training complete. Leaderboard: results/%s/model_leaderboard.csv", args.task)
     return 0

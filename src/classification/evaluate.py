@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_checkpoint_model(model_dir: Path, num_classes: int, device: torch.device):
-    ckpt = torch.load(model_dir / "best.pt", map_location=device, weights_only=False)
+    ckpt = torch.load(model_dir / "best.pt", map_location=device, weights_only=True)
     model = build_model(ckpt["model_name"], ckpt.get("num_classes", num_classes), pretrained=False)
     model.load_state_dict(ckpt["model"])
     return model.to(device), ckpt
