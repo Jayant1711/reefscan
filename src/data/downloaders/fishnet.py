@@ -64,7 +64,11 @@ def _download(url: str, dest: Path) -> Path:
         check=False,
     )
     if result.returncode != 0 or not dest.exists():
-        raise RuntimeError(f"Download failed for {url} (curl exit {result.returncode})")
+        hint = ""
+        if dest.exists():
+            hint = " A partial file exists — if the server does not support ranges, " \
+                   "delete it and re-run for a fresh download."
+        raise RuntimeError(f"Download failed for {url} (curl exit {result.returncode}).{hint}")
     if not _zf.is_zipfile(dest):
         dest.unlink(missing_ok=True)
         raise RuntimeError(

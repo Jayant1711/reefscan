@@ -9,6 +9,9 @@ project:
   seed: 42
 
 paths:
+  # NOTE: task-level dataset dirs (fish.data_dir, coral.data_dir, seg.data_dir)
+  # stay repo-relative — run CLIs from the repo root (platform profiles pin
+  # absolute paths where that matters).
   data_root: datasets
   models_dir: models
   results_dir: results

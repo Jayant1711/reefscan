@@ -34,7 +34,10 @@ def download_deepfish(data_dir: str | Path, keep_archive: bool = False) -> Path:
 
     logger.info("Extracting DeepFish ...")
     with tarfile.open(tar_path, "r") as tf:
-        tf.extractall(data_dir)
+        try:
+            tf.extractall(data_dir, filter="data")  # py3.12+: no deprecation, safe members
+        except TypeError:  # py<3.11.4 has no filter kwarg
+            tf.extractall(data_dir)
     sentinel.write_text("ok\n", encoding="utf-8")  # marks a COMPLETE extraction
 
     if not keep_archive:

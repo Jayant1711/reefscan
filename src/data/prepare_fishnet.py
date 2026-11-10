@@ -105,6 +105,9 @@ def prepare_fishnet_subset(
     raw_dir, out_dir = Path(raw_dir), Path(out_dir)
     done_marker = out_dir / "_COMPLETE"
     if done_marker.exists():
+        # NOTE: the marker records completion, not the config that produced it —
+        # after changing fish.prepare.* (level/top_k/min_images) delete the
+        # marker (or the curated dir) to rebuild with the new settings.
         logger.info("Curated fish subset already complete at %s — skipping.", out_dir)
         return out_dir
     # The crop loop itself is idempotent (per-crop dest.exists() skip), so an
