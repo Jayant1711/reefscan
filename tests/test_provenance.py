@@ -76,7 +76,7 @@ def test_strategies_constant_matches_cli():
 
 
 def test_feature_extraction_freezes_backbone():
-    model = build_model("resnet34", num_classes=3, freeze_backbone=True)
+    model = build_model("resnet34", num_classes=3, freeze_backbone=True, pretrained=False)
     head_trainable = [n for n, p in model.named_parameters() if p.requires_grad]
     assert head_trainable, "head must stay trainable"
     assert all("fc" in n for n in head_trainable), "only head params train in FE mode"
@@ -85,7 +85,7 @@ def test_feature_extraction_freezes_backbone():
 
 
 def test_unfreeze_stage_resnet_only_last_block():
-    model = build_model("resnet34", num_classes=3, freeze_backbone=True)
+    model = build_model("resnet34", num_classes=3, freeze_backbone=True, pretrained=False)
     before = count_params(model)["params_trainable"]
     unfreeze_stage(model, "resnet34")
     trainable = {n for n, p in model.named_parameters() if p.requires_grad}
@@ -97,7 +97,7 @@ def test_unfreeze_stage_resnet_only_last_block():
 
 def test_unfreeze_stage_all_backbones():
     for name in SUPPORTED_MODELS:
-        model = build_model(name, num_classes=2, freeze_backbone=True)
+        model = build_model(name, num_classes=2, freeze_backbone=True, pretrained=False)
         unfreeze_stage(model, name)  # must not raise
         assert any(p.requires_grad for n, p in model.named_parameters() if n.startswith(
             {"resnet34": "layer4", "efficientnet_b0": "features.7",
@@ -107,7 +107,7 @@ def test_unfreeze_stage_all_backbones():
 
 def test_partial_finetune_groups_include_dormant_params():
     """Frozen backbone params stay in the optimizer so mid-training unfreeze needs no rebuild."""
-    model = build_model("efficientnet_b0", num_classes=2, freeze_backbone=True)
+    model = build_model("efficientnet_b0", num_classes=2, freeze_backbone=True, pretrained=False)
     groups = partial_finetune_groups(model, "efficientnet_b0", lr=1e-4)
     grouped = sum(len(g["params"]) for g in groups)
     total = len(list(model.parameters()))
@@ -116,8 +116,12 @@ def test_partial_finetune_groups_include_dormant_params():
     assert max(lrs) == 1e-3  # head at 10x
 
 
+# NOTE: pretrained=False everywhere — structure tests, no 230MB weight download
+# (keeps the platform pytest gate fast and network-free).
+
+
 def test_param_groups_excludes_frozen():
-    model = build_model("resnet34", num_classes=2, freeze_backbone=True)
+    model = build_model("resnet34", num_classes=2, freeze_backbone=True, pretrained=False)
     groups = param_groups(model, lr=1e-4)
     n_optim = sum(len(g["params"]) for g in groups)
     assert n_optim == sum(1 for p in model.parameters() if p.requires_grad)
