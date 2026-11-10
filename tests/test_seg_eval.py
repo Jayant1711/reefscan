@@ -46,8 +46,8 @@ def test_greedy_match_claims_best_iou_first():
 def test_dice_iou_perfect_and_empty():
     target = torch.zeros(1, 1, 64, 64)
     target[0, 0, 10:30, 10:30] = 1.0
-    logits = torch.zeros(1, 1, 64, 64)
-    logits[0, 0, 10:30, 10:30] = 20.0   # sigmoid -> ~1.0 exactly on target
+    logits = torch.full((1, 1, 64, 64), -20.0)  # background clearly negative
+    logits[0, 0, 10:30, 10:30] = 20.0            # sigmoid -> ~1.0 exactly on target
     dice, iou = dice_iou_scores(logits, target)
     assert dice > 0.999 and iou > 0.999
 
@@ -71,6 +71,8 @@ def synthetic_seg_env(tmp_path_factory):
     from PIL import Image
 
     root = tmp_path_factory.mktemp("deepfish")
+    (root / "img").mkdir(parents=True, exist_ok=True)
+    (root / "masks").mkdir(parents=True, exist_ok=True)
     size = 64
     rng = np.random.default_rng(0)
     for i in range(6):

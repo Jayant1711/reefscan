@@ -155,6 +155,9 @@ class ReefScanPipeline:
             max_disappeared=cfg.realtime.tracker_max_disappeared,
             min_distance=cfg.realtime.tracker_min_distance,
         )
+        # True while process_video owns the tracker (resetting per frame would
+        # destroy unique-ID counting — video tracks must persist across frames).
+        self._suppress_tracker_reset = False
 
     # ------------------------------------------------------------- preprocess
     def _preprocess(self, image_bgr: np.ndarray, size: int) -> torch.Tensor:
@@ -176,7 +179,7 @@ class ReefScanPipeline:
         timings: dict[str, float] = {}
 
         t0 = time.perf_counter()
-        if track and self.cfg.realtime.get("tracker_enabled", True):
+        if track and not self._suppress_tracker_reset and self.cfg.realtime.get("tracker_enabled", True):
             # Dashboard singleton is process-wide: reset per analysis so
             # concurrent sessions cannot bleed track IDs into each other.
             self.tracker = CentroidTracker(
@@ -303,6 +306,7 @@ class ReefScanPipeline:
             writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps / frame_skip, (width, height))
 
         self.tracker = CentroidTracker(self.cfg.realtime.tracker_max_disappeared, self.cfg.realtime.tracker_min_distance)
+        self._suppress_tracker_reset = True  # per-frame analyze_image must not reset it
         trend = BleachingTrendAnalyzer(self.cfg.analytics.trend_ewma_alpha)
         rows: list[dict] = []
         frame_idx = processed = 0

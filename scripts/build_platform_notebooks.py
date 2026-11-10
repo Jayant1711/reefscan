@@ -47,7 +47,11 @@ repo = "REPO_DIR"
 if not os.path.exists(repo):
     !git clone {REPO_URL} {{repo}}
 else:
-    !git -C {{repo}} pull --ff-only
+    # fetch + reset: tracked files update to origin even if a previous phase
+    # regenerated tracked files locally (the ledger) — untracked artifacts
+    # (models/results/runs) are never touched.
+    !git -C {{repo}} fetch origin
+    !git -C {{repo}} reset --hard origin/main
 %cd {{repo}}
 !pip install -q -r requirements.txt
 
@@ -123,9 +127,11 @@ for model in top2:
         ft_failures.append(model)
         print(f"WARNING: fine-tune failed for {model} - continuing")
 print("Fine-tune failures:", ft_failures or "none")
-# Optional middle ground on the overall winner:
-subprocess.run([sys.executable, "train.py", "--task", "coral", "--model", top2[0],
-                "--strategy", "partial_finetune", "--platform", "kaggle"], check=True)
+# Optional middle ground on the overall winner (most memory-hungry step — non-fatal):
+r = subprocess.run([sys.executable, "train.py", "--task", "coral", "--model", top2[0],
+                    "--strategy", "partial_finetune", "--platform", "kaggle"])
+if r.returncode != 0:
+    print("WARNING: partial_finetune failed (often OOM) - finetune checkpoints above are kept")
 !python evaluate.py --task coral --platform kaggle
 pd.read_csv("results/coral/model_leaderboard.csv")"""),
         code("""# --- 6. E3 — fish segmentation U-Net (~30 min) + IoU/Dice/AP metrics -------
