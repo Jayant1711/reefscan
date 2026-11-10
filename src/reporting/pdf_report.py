@@ -273,7 +273,11 @@ class ReefScanReportBuilder:
 
 
 def _dist_from_analytics(analytics: SurveyAnalytics) -> dict[str, float]:
-    """Condition distribution from per-observation severity (proxy classes)."""
+    """Condition distribution: computed by SurveyAnalytics (config thresholds)."""
+    dist = getattr(analytics, "condition_distribution", None)
+    if dist:
+        return dist
+    # Legacy fallback: recompute from the trend history with default thresholds.
     from ..coral_analysis.severity import index_to_class_strict
 
     dist = {c: 0.0 for c in SEVERITY_CLASSES}

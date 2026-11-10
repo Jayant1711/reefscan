@@ -139,10 +139,13 @@ def load_config(
         cfg.set_nested(key.strip(), _coerce_scalar(value))
         logger.debug("Override %s=%r", key.strip(), cfg.get_nested(key.strip()))
 
-    # Resolve all paths relative to the project root for portability.
+    # Resolve all paths relative to the project root for portability. Values
+    # that are already absolute (platform overlays) pass through untouched.
     root = Path(__file__).resolve().parents[2]
-    if not cfg.get_nested("paths.data_root", "").startswith(("datasets", "models", "results", "reports")):
-        cfg.paths.data_root = str(root / cfg.paths.data_root)
+    for key in ("data_root", "models_dir", "results_dir", "reports_dir", "demo_dir"):
+        value = cfg.get_nested(f"paths.{key}")
+        if value and not Path(value).is_absolute():
+            cfg.paths[key] = str(root / value)
 
     return cfg
 

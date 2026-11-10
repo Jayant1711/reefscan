@@ -13,6 +13,8 @@ venv/
 # --- Data (large, downloaded separately) ---
 datasets/*
 !datasets/.gitkeep
+!datasets/synthetic/
+datasets/synthetic/*
 !datasets/synthetic/README.md
 
 # --- Model weights ---

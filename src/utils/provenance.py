@@ -35,7 +35,8 @@ def detect_platform() -> str:
         return "kaggle"
     if os.environ.get("COLAB_GPU") or os.path.exists("/content"):
         return "colab"
-    if os.environ.get("LIGHTNING_CLOUD_PROJECT_ID") or os.environ.get("LIGHTNING_API_TOKEN"):
+    if (os.environ.get("LIGHTNING_CLOUD_PROJECT_ID") or os.environ.get("LIGHTNING_API_TOKEN")
+            or os.path.exists("/teamspace")):
         return "lightning"
     return "local"
 

@@ -56,7 +56,8 @@ def render_row(m: dict) -> str:
         f"| {m['_run_id']} | {m.get('platform', '?')} | {m.get('dataset', '?')} | "
         f"{m.get('strategy', '?')} | {total_m:.2f}M / {trainable_m:.2f}M | {minutes:.1f} min | "
         f"{fmt(fm.get('accuracy'))} | {fmt(fm.get('macro_ap'))} | {fmt(fm.get('macro_f1'))} | "
-        f"{fmt(fm.get('weighted_f1'))} | {fmt(fm.get('iou'))} | {fmt(fm.get('dice'))} | "
+        f"{fmt(fm.get('weighted_f1'))} | {fmt(fm.get('iou', fm.get('best_val_iou')))} | "
+        f"{fmt(fm.get('dice', fm.get('best_val_dice')))} | "
         f"{fmt(fm.get('box_ap50'))} | {m.get('git_sha', '?')} | {m['_source']} |"
     )
 

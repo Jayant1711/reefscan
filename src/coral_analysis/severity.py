@@ -72,7 +72,7 @@ def index_to_class(index: float, thresholds: tuple[float, ...] = (15, 35, 60, 85
     if index < thresholds[2]:
         return "moderate"
     if index < thresholds[3]:
-        return "dead" if index >= thresholds[3] else "severe"
+        return "severe"
     return "dead"
 
 

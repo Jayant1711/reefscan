@@ -39,8 +39,25 @@ def class_weights(counts: dict[str, int], mode: str = "inverse_sqrt") -> np.ndar
     return weights / weights.mean()  # normalise to mean 1
 
 
-def sample_weights(dataset_targets: Sequence[int], counts: dict[str, int]) -> list[float]:
-    """Per-sample weights for WeightedRandomSampler from class counts."""
+def sample_weights(dataset_targets: Sequence[int], counts: dict[str, int],
+                   class_names: Sequence[str] | None = None) -> list[float]:
+    """Per-sample weights for WeightedRandomSampler from class counts.
+
+    ``counts`` may cover only the classes present in one split; when
+    ``class_names`` (the shared train/val/test list) is supplied, targets are
+    resolved by name and classes absent from ``counts`` get the maximum weight
+    instead of raising KeyError or silently swapping weights.
+    """
+    if class_names is not None:
+        max_count = max(counts.values()) if counts else 1
+        per_class = {
+            idx: counts.get(name, 0) or max_count  # missing class -> drawn as rarest
+            for idx, name in enumerate(class_names)
+        }
+        values = np.array([per_class[t] for t in range(len(class_names))], dtype=np.float64)
+        inv = (len(dataset_targets) / (len(class_names) * np.maximum(values, 1)))
+        per_class = {i: inv[i] for i in range(len(class_names))}
+        return [per_class[t] for t in dataset_targets]
     names = sorted(counts)
     freq = np.array([counts[n] for n in names], dtype=np.float64)
     inv = len(dataset_targets) / (len(names) * freq)
@@ -49,10 +66,11 @@ def sample_weights(dataset_targets: Sequence[int], counts: dict[str, int]) -> li
 
 
 def make_weighted_sampler(dataset_targets: Sequence[int], counts: dict[str, int],
-                          replacement: bool = True) -> WeightedRandomSampler:
+                          replacement: bool = True,
+                          class_names: Sequence[str] | None = None) -> WeightedRandomSampler:
     """Sampler that balances class exposure per epoch."""
-    weights = sample_weights(dataset_targets, counts)
-    return WeightedRandomSampler(torch_weights := weights, num_samples=len(weights), replacement=replacement)
+    weights = sample_weights(dataset_targets, counts, class_names=class_names)
+    return WeightedRandomSampler(weights, num_samples=len(weights), replacement=replacement)
 
 
 def imbalance_ratio(counts: dict[str, int]) -> float:

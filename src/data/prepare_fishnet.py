@@ -75,12 +75,9 @@ def _image_level_split(img_ids: list[str], fractions: tuple[float, float, float]
     return assignment
 
 
-def _crop_and_save(img_path: Path, box: tuple[int, int, int, int],
-                   dest: Path, margin: float = BBOX_MARGIN_FRACTION) -> bool:
-    """Crop one bbox (with context margin) from a frame; skip degenerate boxes."""
-    img = cv2.imread(str(img_path))
-    if img is None:
-        return False
+def _crop_and_save_from(img: "np.ndarray", box: tuple[int, int, int, int],
+                        dest: Path, margin: float = BBOX_MARGIN_FRACTION) -> bool:
+    """Crop one bbox (with context margin) from an already-decoded frame."""
     h, w = img.shape[:2]
     x1, y1, x2, y2 = box
     mx, my = int((x2 - x1) * margin), int((y2 - y1) * margin)
@@ -106,10 +103,12 @@ def prepare_fishnet_subset(
 ) -> Path:
     """Crop fish bboxes from the fishnet.ai archive into a classification ImageFolder."""
     raw_dir, out_dir = Path(raw_dir), Path(out_dir)
-    existing = list(out_dir.rglob("*.jpg")) if out_dir.exists() else []
-    if len(existing) > 100:
-        logger.info("Curated fish subset already present at %s (%d crops) — skipping.", out_dir, len(existing))
+    done_marker = out_dir / "_COMPLETE"
+    if done_marker.exists():
+        logger.info("Curated fish subset already complete at %s — skipping.", out_dir)
         return out_dir
+    # The crop loop itself is idempotent (per-crop dest.exists() skip), so an
+    # interrupted run simply continues where it stopped — no partial-data trap.
 
     labels_csv = _find_labels_csv(raw_dir)
     if labels_csv is None:
@@ -139,6 +138,13 @@ def prepare_fishnet_subset(
                 len(keep), label_col, min_images_per_class, sorted(keep))
 
     work = df[df[label_col].isin(keep)].copy()
+    coord_cols = ["x_min", "x_max", "y_min", "y_max"]
+    for col in coord_cols + ["bbox_id"]:
+        work[col] = pd.to_numeric(work[col], errors="coerce")
+    dropped_rows = int(work[coord_cols].isna().any(axis=1).sum())
+    if dropped_rows:
+        logger.warning("Dropping %d malformed bbox rows (non-numeric coordinates).", dropped_rows)
+        work = work.dropna(subset=coord_cols + ["bbox_id"])
     img_index = _index_images(raw_dir)
     missing_images = sum(1 for iid in work["img_id"].unique() if str(iid) not in img_index)
     if missing_images:
@@ -151,6 +157,14 @@ def prepare_fishnet_subset(
 
     per_split_class = defaultdict(int)
     saved, skipped = 0, 0
+    frame_cache: dict[str, "np.ndarray | None"] = {}
+
+    def _frame(img_path: Path, img_id: str):
+        """Decode each frame once (rows of one img_id share the decode)."""
+        if img_id not in frame_cache:
+            frame_cache[img_id] = cv2.imread(str(img_path))
+        return frame_cache[img_id]
+
     for row in work.itertuples(index=False):
         img_id = str(row.img_id)
         img_path = img_index.get(img_id)
@@ -163,16 +177,24 @@ def prepare_fishnet_subset(
         if dest.exists():
             saved += 1
             continue
+        img = _frame(img_path, img_id)
+        if img is None:
+            skipped += 1
+            continue
         box = (int(row.x_min), int(row.y_min), int(row.x_max), int(row.y_max))
-        if _crop_and_save(img_path, box, dest):
+        if _crop_and_save_from(img, box, dest):
             saved += 1
             per_split_class[(split, class_name)] += 1
         else:
             skipped += 1
+        # keep the cache bounded (Albacore schools repeat frames rarely)
+        if len(frame_cache) > 64:
+            frame_cache.clear()
 
     logger.info("Cropped %d fish regions (%d skipped: missing frames/degenerate boxes).", saved, skipped)
     for split in ("train", "validation", "test"):
         total = sum(v for (s, _), v in per_split_class.items() if s == split)
         classes = len({c for (s, c), v in per_split_class.items() if s == split and v > 0})
         logger.info("Split '%s': %d crops across %d classes.", split, total, classes)
+    done_marker.write_text("ok\n", encoding="utf-8")
     return out_dir

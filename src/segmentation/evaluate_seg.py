@@ -46,6 +46,8 @@ def evaluate_segmentation(
     model = SmallUNet().to(device)
     model.load_state_dict(bundle["model"])
     model.eval()
+    # Prefer the size the model was trained at (checkpoint stores it).
+    image_size = int(bundle.get("image_size", image_size))
 
     _, val_loader = make_seg_loaders(data_dir, image_size=image_size, batch_size=batch_size)
     if val_loader is None:
@@ -108,7 +110,7 @@ def evaluate_segmentation(
             box_ap50 = float(tps.mean())
 
     metrics = {
-        "n_val_images": int(sum(1 for _ in val_loader.dataset)),
+        "n_val_images": int(len(val_loader.dataset)),
         "iou": float(np.mean(ious)),
         "dice": float(np.mean(dices)),
         "pixel_ap": pixel_ap,

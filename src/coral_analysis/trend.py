@@ -75,7 +75,7 @@ class BleachingTrendAnalyzer:
         fig, ax = plt.subplots(figsize=(7, 3.6))
         ax.plot(df["step"], df["severity_index"], "o-", ms=4, label="BSI per observation", color="#1f77b4")
         if len(df) >= 2:
-            ewma = df["severity_index"].ewm(alpha=self.ewma_alpha).mean()
+            ewma = df["severity_index"].ewm(alpha=self.ewma_alpha, adjust=False).mean()
             ax.plot(df["step"], ewma, "--", lw=2, label="EWMA", color="#d62728")
         for y, lab in ((15, "Mild"), (35, "Moderate"), (60, "Severe"), (85, "Dead")):
             ax.axhline(y, ls=":", lw=0.8, color="grey")

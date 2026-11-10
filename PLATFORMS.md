@@ -15,7 +15,7 @@
 %cd reefscan
 !pip install -q -r requirements.txt
 import torch; print("GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU ONLY — STOP")
-!python -m pytest tests/ -q    # verify the full suite (~65 tests) on the platform
+!python -m pytest tests/ -q    # verify the full suite (~60 tests) on the platform
 ```
 
 GPU runtimes (enable BEFORE running any cell):
@@ -87,7 +87,7 @@ Download: Kaggle notebook **Output panel** → the `reefscan_artifacts_kaggle_*.
 !python scripts/log_experiment.py
 !python scripts/export_artifacts.py
 from google.colab import files
-import glob; files.download(glob.glob("/content/reefscan/reefscan_artifacts_colab_*.zip")[0])
+import glob; files.download(sorted(glob.glob("/content/reefscan/reefscan_artifacts_colab_*.zip"))[-1])
 ```
 
 Colab "Allocating runtime" hangs? → Disconnect & reconnect, or switch to Lightning for that phase (E7).
@@ -132,9 +132,9 @@ best model per task, its strategy, params, training time, and the FE-screen runn
 
 | Symptom | Fix |
 |---|---|
-| Kaggle session fails to start | Known transient incident — retry later; move that phase to Colab/Lightning (E7) |
+| Kaggle session fails to start | Known transient incident — retry later; move that phase to Colab/Lightning (E7). **Save & Run All re-downloads ~8 GB** (datasets live in `/kaggle/tmp`), so prefer interactive runs + the Output-panel zip. |
 | Colab "Allocating runtime" forever | Free-tier capacity — retry off-peak or switch platform |
 | `CUDA out of memory` | `--set <task>.batch_size=32` (or 16) |
-| FishNet gdown quota | Use the S3 mirror (already the default) — `download_data.py --dataset fishnet` |
+| FishNet download slow/fails | fishnet.ai S3 mirror with resume (`curl -f -C -`): re-run the cell — partial zips resume. If extraction died mid-way, delete the dataset's `_EXTRACTED` marker to force a clean re-extract. |
 | Zip too big for browser download | `python scripts/export_artifacts.py --no-models` for a metrics-only zip, download checkpoints individually from the Output panel |
 | Lost a session before exporting | The experiment matrix rows for that platform are simply re-run — manifests under `runs/` on your laptop tell you which |

@@ -25,6 +25,10 @@ SPLIT_DIRS = {"train": "train", "validation": "validation", "test": "test"}
 
 
 def _imagefolder_ready(root: Path, min_images: int = 100) -> bool:
+    # A _COMPLETE marker is written only after every split has been materialised,
+    # so an interrupted download is never mistaken for a ready dataset.
+    if not (root.parent / "_COMPLETE").exists():
+        return False
     if not root.exists():
         return False
     total = sum(1 for _ in root.rglob("*.jpg")) + sum(1 for _ in root.rglob("*.png"))
@@ -139,6 +143,7 @@ def download_coral(data_dir: str | Path, force: bool = False) -> Path:
         logger.warning("`datasets` download failed (%s) — falling back to parquet + pyarrow ...", exc)
         _save_via_parquet(root)
 
+    (root.parent / "_COMPLETE").write_text("ok\n", encoding="utf-8")
     n = sum(1 for _ in root.rglob("*.jpg"))
     logger.info("Coral dataset ready: %d images under %s", n, root)
     return root

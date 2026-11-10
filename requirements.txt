@@ -3,7 +3,7 @@
 # On Google Colab / Kaggle, torch+torchvision GPU builds are preinstalled.
 
 # --- Core deep learning ---
-torch>=2.1
+torch>=2.3
 torchvision>=0.16
 
 # --- Numeric / ML stack ---
@@ -33,7 +33,7 @@ reportlab>=4.0
 huggingface_hub>=0.20
 pyarrow>=14.0          # parquet reader for NOAA coral dataset fallback
 datasets>=2.16         # optional but recommended on Colab
-gdown>=5.0             # FishNet Google Drive download
+tabulate>=0.9             # FishNet Google Drive download
 
 # --- Dev / tests ---
 pytest>=7.4

@@ -27,7 +27,8 @@ def main() -> int:
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
 
-    ckpt_path = Path("models") / args.task / args.model / "best.pt"
+    root = Path(__file__).resolve().parents[1]
+    ckpt_path = root / "models" / args.task / args.model / "best.pt"
     if not ckpt_path.exists():
         raise FileNotFoundError(f"{ckpt_path} not found — train the model first.")
 

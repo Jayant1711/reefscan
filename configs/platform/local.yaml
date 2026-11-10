@@ -1,0 +1,3 @@
+# Local machine profile — repo-relative paths, conservative workers.
+device:
+  num_workers: 0

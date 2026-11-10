@@ -78,9 +78,9 @@ def prepare_fishnet(cfg) -> None:
 def main() -> int:
     args = parse_args()
     cfg = load_config(args.config)
+    setup_logging(level=cfg.logging.level, log_file=cfg.logging.file)
     apply_platform(cfg, args.platform)
     override_from_args(cfg, args)
-    setup_logging(level=cfg.logging.level, log_file=cfg.logging.file)
 
     if args.prepare_fishnet:
         prepare_fishnet(cfg)
@@ -104,7 +104,9 @@ def main() -> int:
     if args.dataset in ("all", "fishnet"):
         from src.data.downloaders import download_fishnet
 
-        path = download_fishnet(root / "fishnet" / "raw")
+        fish_raw = Path(getattr(cfg.fish, "raw_dir", root / "fishnet" / "raw"))
+        fish_raw.mkdir(parents=True, exist_ok=True)
+        path = download_fishnet(fish_raw)
         logger.info("✅ FishNet ready -> %s", path)
         prepare_fishnet(cfg)
 

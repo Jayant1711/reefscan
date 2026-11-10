@@ -48,6 +48,7 @@ def main() -> int:
         f"created_utc : {datetime.now(timezone.utc).isoformat()}",
         f"platform    : {platform}",
         f"git_sha     : {git_sha(root)}",
+        f"no_models   : {args.no_models}",
         "",
     ]
 
@@ -61,10 +62,10 @@ def main() -> int:
             for file_path in sorted(folder.rglob("*")):
                 if not file_path.is_file():
                     continue
-                if file_path.suffix in {".pt", ".pth"} and args.no_models:
+                if args.no_models and file_path.suffix in {".pt", ".pth", ".onnx"}:
                     continue
-                # Skip demo placeholder checkpoints (no trained value).
-                if "models/demo" in file_path.as_posix():
+                # Demo placeholder checkpoints carry no trained value.
+                if "models/demo" in file_path.as_posix() and file_path.suffix in {".pt", ".pth", ".onnx"}:
                     continue
                 arcname = file_path.relative_to(root)
                 zf.write(file_path, arcname=str(arcname))

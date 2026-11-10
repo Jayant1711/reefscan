@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import math
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -57,7 +57,11 @@ class TrainConfig:
                     "data_dir", "raw_dir", "task_name", "image_size", "batch_size", "pretrained",
                     "freeze_backbone", "models_dir")
         section = {k: v for k, v in section.items() if k not in aug_keys}
-        cfg = cls(**section)
+        known = {f.name for f in fields(cls)}
+        dropped = [k for k in section if k not in known]
+        if dropped:
+            logger.warning("Ignoring unknown %s keys: %s", cls.__name__, dropped)
+        cfg = cls(**{k: v for k, v in section.items() if k in known})
         if cfg.strategy not in STRATEGIES:
             raise ValueError(f"Unknown strategy '{cfg.strategy}'. Supported: {STRATEGIES}")
         return cfg
@@ -95,12 +99,14 @@ class Trainer:
         device: torch.device,
         out_dir: str | Path,
         class_weight: torch.Tensor | None = None,
+        image_size: int = 224,
     ) -> None:
         self.model_name = model_name
         self.device = device
         self.cfg = cfg
         self.class_names = list(class_names)
         self.out_dir = ensure_dir(out_dir)
+        self.image_size = int(image_size)
 
         # Strategy selection -------------------------------------------------
         # finetune            : all params train (head at 10x LR).
@@ -144,7 +150,11 @@ class Trainer:
                 return 0.5 * (1 + math.cos(math.pi * progress))
             self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
         else:
-            self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=cfg.epochs // 3 or 1, gamma=0.1)
+            self.scheduler = torch.optim.lr_scheduler.StepLR(
+                self.optimizer,
+                step_size=max(1, (cfg.epochs // 3 or 1) * steps_per_epoch),
+                gamma=0.1,
+            )
 
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -155,7 +165,7 @@ class Trainer:
         self.best_epoch = -1
         self._bad_epochs = 0
         self._stop = False
-        self._unfreeze_pending = cfg.strategy == "partial_finetune" and cfg.freeze_epochs > 0
+        self._unfreeze_pending = cfg.strategy == "partial_finetune"
         self.params = {
             "params_total": sum(p.numel() for p in self.model.parameters()),
             "params_trainable": sum(p.numel() for p in self.model.parameters() if p.requires_grad),
@@ -172,6 +182,9 @@ class Trainer:
         if self._unfreeze_pending and epoch > self.cfg.freeze_epochs:
             unfreeze_stage(self.model, self.model_name)
             self._unfreeze_pending = False
+            self.params["params_trainable"] = sum(
+                p.numel() for p in self.model.parameters() if p.requires_grad
+            )
 
     # ------------------------------------------------------------- train loop
     def fit(self) -> list[EpochLog]:
@@ -188,19 +201,18 @@ class Trainer:
                 log.val_acc = val_metrics["accuracy"]
                 log.val_macro_f1 = val_metrics["macro_f1"]
                 log.val_weighted_f1 = val_metrics["weighted_f1"]
-                self._save_history_csv()
                 self._checkpoint_if_best(log, val_metrics)
                 logger.info("Epoch %d | loss %.4f | acc %.4f | val loss %.4f | val acc %.4f | wF1 %.4f | %.1fs",
                             epoch, train_loss, train_acc, log.val_loss, log.val_acc, log.val_weighted_f1, log.seconds)
-                if self._check_early_stop(log):
-                    logger.info("Early stopping at epoch %d (best epoch %d).", epoch, self.best_epoch)
-                    break
             else:
-                self._save_history_csv()
                 self._checkpoint_if_best(log, {"accuracy": train_acc})
                 logger.info("Epoch %d | loss %.4f | acc %.4f | %.1fs", epoch, train_loss, train_acc, log.seconds)
 
             self.history.append(log)
+            self._save_history_csv()
+            if self.val_loader is not None and self._check_early_stop(log):
+                logger.info("Early stopping at epoch %d (best epoch %d).", epoch, self.best_epoch)
+                break
 
         # Restore best weights for downstream evaluation.
         best_path = self.out_dir / "best.pt"
@@ -212,7 +224,7 @@ class Trainer:
 
     def _train_epoch(self) -> tuple[float, float]:
         self.model.train()
-        total_loss, correct, seen = 0.0, 0, 0
+        total_loss, correct, seen, loss_seen = 0.0, 0, 0, 0
         pbar = tqdm(self.train_loader, desc=f"train {self.model_name}", leave=False)
         for inputs, targets in pbar:
             inputs = inputs.to(self.device, non_blocking=True)
@@ -226,9 +238,11 @@ class Trainer:
                     mixed = lam * inputs + (1 - lam) * inputs[idx]
                     outputs = self.model(mixed)
                     loss = mixup_criterion(outputs, targets, targets[idx], lam, self.criterion)
+                    mixed_batch = True  # accuracy vs clean targets would be meaningless
                 else:
                     outputs = self.model(inputs)
                     loss = self.criterion(outputs, targets)
+                    mixed_batch = False
 
             self.scaler.scale(loss).backward()
             if self.cfg.grad_clip:
@@ -239,10 +253,13 @@ class Trainer:
             self.scheduler.step()
 
             total_loss += loss.item() * inputs.size(0)
-            correct += (outputs.argmax(1) == targets).sum().item()
-            seen += inputs.size(0)
-            pbar.set_postfix(loss=f"{total_loss / max(1, seen):.3f}", acc=f"{correct / max(1, seen):.3f}")
-        return total_loss / max(1, seen), correct / max(1, seen)
+            loss_seen += inputs.size(0)
+            if not mixed_batch:
+                correct += (outputs.argmax(1) == targets).sum().item()
+                seen += inputs.size(0)
+            pbar.set_postfix(loss=f"{total_loss / max(1, loss_seen):.3f}",
+                             acc=f"{correct / max(1, seen):.3f}")
+        return total_loss / max(1, loss_seen), (correct / max(1, seen) if seen else 0.0)
 
     @torch.no_grad()
     def validate(self) -> dict[str, float]:
@@ -297,6 +314,7 @@ class Trainer:
                     "metric": float(value),
                     "strategy": self.cfg.strategy,
                     "params": self.params,
+                    "image_size": self.image_size,
                 },
                 self.out_dir / "best.pt",
             )

@@ -20,8 +20,8 @@ def download_deepfish(data_dir: str | Path, keep_archive: bool = False) -> Path:
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     extracted = data_dir / "DeepFish"
-
-    if extracted.exists() and any(extracted.rglob("*.jpg")):
+    sentinel = data_dir / "_EXTRACTED"
+    if sentinel.exists() and extracted.exists() and any(extracted.rglob("*.jpg")):
         logger.info("DeepFish already extracted at %s — skipping.", extracted)
         return extracted
 
@@ -35,6 +35,7 @@ def download_deepfish(data_dir: str | Path, keep_archive: bool = False) -> Path:
     logger.info("Extracting DeepFish ...")
     with tarfile.open(tar_path, "r") as tf:
         tf.extractall(data_dir)
+    sentinel.write_text("ok\n", encoding="utf-8")  # marks a COMPLETE extraction
 
     if not keep_archive:
         try:

@@ -101,7 +101,9 @@ def build_dataloaders(
             ds.targets = [remap[t] for t in ds.targets]
             ds.samples = [(path, remap[label]) for (path, label) in ds.samples]
             ds.classes = class_names
-        sampler = make_weighted_sampler(ds.targets, count_class_images(split_dir)) if (train and balance_train) else None
+        sampler = (make_weighted_sampler(ds.targets, count_class_images(split_dir),
+                                         class_names=class_names)
+                   if (train and balance_train) else None)
         return DataLoader(
             ds,
             batch_size=batch_size,

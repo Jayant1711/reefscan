@@ -16,7 +16,7 @@
 | **fishnet.ai v0.1.2** (The Nature Conservancy, fishnet.ai/download, S3 mirror) | fish species classification from **bbox crops** | labels 2.1 MB CSV + images 5.7 GB; **verified schema**: `img_id, bbox_id, x_min, x_max, y_min, y_max, label_l1, label_l2` — 159,119 boxes / 34,987 frames / 28 L1 species classes (top: Albacore 33.9K, Yellowfin tuna 6.7K, Bigeye tuna 2.8K, Opah 1.6K, Mahi 1.1K…) / 13 L2 codes | derived **seeded image-level split** 80/10/10 (no official split column in v0.1.2; every crop of one frame stays in one split — no leakage) | Real EM-camera fish imagery with species labels; `Human`(104K)/`Unknown`/`No fish` boxes excluded; classes with <100 boxes dropped → ~10–12 species classes; crops mirror the real-time pipeline's per-box classification |
 | **DeepFish** (`Alzayats/DeepFish` on HF) | fish segmentation → detection boxes | 620 pixel masks from 39,766 frames (~7.1 GB tar) | 80/20 seeded split (seed 42) | Only free dataset with paired Full-HD frames + pixel masks; feeds the real-time box/counting pipeline |
 
-Download: `python download_data.py --dataset {coral,fishnet,deepfish}` — all idempotent (skip if present).
+Download: `python download_data.py --dataset {coral,fishnet,deepfish}` — idempotent via completion markers; an *interrupted* download re-runs cleanly (partial archives resume, incomplete extractions are never mistaken for done).
 FishNet preparation (`src/data/prepare_fishnet.py`) is written against the **verified** v0.1.2 schema and crops every fish bbox with a 5% context margin; schema changes raise an explicit diagnostic.
 
 ## 2. Data cleaning (applied before every training run)

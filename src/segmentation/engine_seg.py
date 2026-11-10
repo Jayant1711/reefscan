@@ -97,6 +97,11 @@ def make_seg_loaders(data_dir: str | Path, image_size: int = 256, batch_size: in
     val_pairs = [pairs[i] for i in order[:n_val]]
     train_pairs = [pairs[i] for i in order[n_val:]]
 
+    if not train_pairs:
+        raise ValueError(
+            f"Not enough image/mask pairs under {data_dir} to form a training split "
+            f"(found {len(pairs)} pair(s)). Download the full DeepFish segmentation set."
+        )
     train_loader = DataLoader(DeepFishSegmentationDataset(train_pairs, image_size, augment=True),
                               batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(DeepFishSegmentationDataset(val_pairs, image_size, augment=False),
@@ -117,8 +122,14 @@ def dice_bce_loss(logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
 
 @torch.no_grad()
 def dice_iou_scores(logits: torch.Tensor, target: torch.Tensor, threshold: float = 0.5) -> tuple[float, float]:
-    """Batch dice + IoU at a fixed threshold."""
+    """Batch dice + IoU at a fixed threshold.
+
+    Perfect agreement on an all-empty batch (no GT fish, none predicted) scores
+    1.0 — the MONAI/segmentation-models convention — instead of 0/0 -> 0.
+    """
     pred = (torch.sigmoid(logits) >= threshold).float()
+    if pred.sum() == 0 and target.sum() == 0:
+        return 1.0, 1.0
     inter = (pred * target).sum()
     union = pred.sum() + target.sum() - inter
     dice = (2 * inter) / torch.clamp(pred.sum() + target.sum(), min=1.0)

@@ -28,7 +28,11 @@ def _gradient(w=96, h=96, seed=0):
 
 
 def test_dhash_stable_under_recompression(tmp_path):
-    arr = _gradient(seed=1)
+    # Smooth gradient — random noise is the pathological case for JPEG + dHash.
+    x = np.linspace(0, 255, 96, dtype=np.float32)
+    xx, yy = np.meshgrid(x, x)
+    arr = np.stack([xx, yy, (xx + yy) / 2], axis=-2).astype(np.uint8).squeeze()
+    arr = np.clip(np.stack([xx, yy, (xx + yy) / 2], axis=-1), 0, 255).astype(np.uint8)
     a = _write(tmp_path / "a.png", arr)
     b = _write(tmp_path / "b.jpg", arr)  # same pixels, different codec
     ha, hb = dhash_of(a), dhash_of(b)

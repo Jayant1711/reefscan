@@ -25,7 +25,7 @@ has run and you have downloaded the zip. Sessions die; your laptop does not.
 
 ## PHASE 1 — Kaggle (coral models + fish segmentation: E1, E2, E3)
 
-Duration: ~1.5–2.5 h of GPU. Quota cost: ~2 h of your 30.
+Duration: ~2–3.5 h of GPU (single GPU). Quota cost: ~3 h of your 30.
 
 | Step | Action |
 |---|---|
@@ -43,7 +43,7 @@ Duration: ~1.5–2.5 h of GPU. Quota cost: ~2 h of your 30.
 
 ## PHASE 2 — Colab (fish species models: E4, E5, E6)
 
-Duration: ~2.5–3.5 h of GPU. Best attempted 06:00–10:00 IST when free T4s are available.
+Duration: ~5–6 h of GPU (fish crops are large). Best attempted 06:00–10:00 IST when free T4s are available. Expect `--set fish.batch_size=32` if ConvNeXt FT runs out of memory.
 
 | Step | Action |
 |---|---|
@@ -110,7 +110,7 @@ Duration: only the missing experiments. Free monthly credits (~15 T4 hours).
 
 | Model | File (inside the zip / after unzip) | Trained on |
 |---|---|---|
-| Coral bleaching (best of 4 × 3 strategies) | `models/coral/<model>/best.pt` | Kaggle |
+| Coral bleaching (FE screen ×4 → FT top-2 → partial winner) | `models/coral/<model>/best.pt` (last-trained strategy per model) | Kaggle |
 | Fish species (FE screen + FT winner) | `models/fish/<model>/best.pt` | Colab |
 | Fish segmentation U-Net | `models/seg/best.pt` | Kaggle |
 | Metrics + leaderboards + PR curves | `results/<task>/...` | both |

@@ -150,6 +150,7 @@ def train_classifier(task: str, model_name: str, cfg, device: torch.device,
         device=device,
         out_dir=out_dir,
         class_weight=weights,
+        image_size=section.image_size,
     )
     t_start = time.time()
     history = trainer.fit()
@@ -188,7 +189,7 @@ def train_segmentation(cfg, device: torch.device) -> None:
     if not data_dir.exists() or not any(data_dir.rglob("*")):
         from src.data.downloaders import download_deepfish
 
-        download_deepfish(cfg.paths.data_root / "deepfish")
+        download_deepfish(Path(cfg.paths.data_root) / "deepfish")
 
     trainer = SegmentationTrainer(
         image_size=cfg.seg.image_size,
@@ -199,15 +200,16 @@ def train_segmentation(cfg, device: torch.device) -> None:
         out_dir=Path(cfg.paths.models_dir) / "seg",
     )
     t_start = time.time()
-    result = trainer.train(data_dir / "DeepFish" if (data_dir / "DeepFish").exists() else data_dir)
+    result = trainer.train(data_dir / "DeepFish" if (data_dir / "DeepFish").exists() else data_dir,
+                           num_workers=cfg.device.num_workers)
     train_seconds = time.time() - t_start
     logger.info("Segmentation done: best val dice %.4f", result["best_val_dice"])
 
     _write_manifest(
         cfg, "seg", "unet_small", "from_scratch", train_seconds,
         epochs_ran=result.get("epochs_ran", 0),
-        final_metrics={"best_val_dice": result["best_val_dice"],
-                       "best_val_iou": result.get("best_val_iou", float("nan"))},
+        final_metrics={"dice": result["best_val_dice"],
+                       "iou": result.get("best_val_iou", float("nan"))},
         params=result.get("params", count_params(trainer.model)),
     )
 

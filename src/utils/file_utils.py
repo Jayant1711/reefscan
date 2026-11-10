@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import logging
 import re
 from datetime import datetime
@@ -23,10 +24,21 @@ def timestamp_slug() -> str:
 
 
 def save_json(data: Any, path: str | Path, indent: int = 2) -> Path:
+    """Save JSON with strict compliance: non-finite floats become ``null``."""
+
+    def _sanitize(obj: Any) -> Any:
+        if isinstance(obj, float):
+            return obj if math.isfinite(obj) else None
+        if isinstance(obj, dict):
+            return {k: _sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [_sanitize(v) for v in obj]
+        return obj
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=indent, ensure_ascii=False, default=str)
+        json.dump(_sanitize(data), fh, indent=indent, ensure_ascii=False, allow_nan=False, default=str)
     logger.debug("Saved JSON -> %s", path)
     return path
 

@@ -31,7 +31,7 @@ def code(text: str) -> dict:
 
 def notebook(cells: list[dict], name: str) -> dict:
     return {
-        "nbformat": 4, "nbformat_minor": 5,
+        "nbformat": 4, "nbformat_minor": 4,
         "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                      "language_info": {"name": "python"},
                      "accelerator": "GPU", "colab": {"provenance": []}},
@@ -43,7 +43,9 @@ SETUP_COMMON = f"""# --- 0. Clone the repo + install dependencies --------------
 !git clone {REPO_URL} REPO_DIR
 %cd REPO_DIR
 !pip install -q -r requirements.txt
-"""
+
+import os
+os.chdir("REPO_DIR")  # keeps later cells working even after a kernel restart"""
 
 GPU_CHECK = """# --- 1. GPU + test-suite check (fails loudly if anything is broken) --------
 import torch, sys
@@ -99,7 +101,8 @@ pd.read_csv("results/coral/model_leaderboard.csv")"""),
         code("""# --- 5. E2 — auto-pick top-2 from the screen and fine-tune them (~50 min) --
 import pandas as pd, subprocess, sys
 lb = pd.read_csv("results/coral/model_leaderboard.csv")
-top2 = lb.nlargest(2, "weighted_f1")["model"].tolist()
+fe = lb[lb["strategy"] == "feature_extraction"]
+top2 = fe.nlargest(2, "weighted_f1")["model"].tolist()
 print("Fine-tuning top-2 from the FE screen:", top2)
 for model in top2:
     subprocess.run([sys.executable, "train.py", "--task", "coral", "--model", model,
@@ -201,14 +204,19 @@ if not done("coral", "resnet34", "feature_extraction"):
     run(["clean_data.py", "--dataset", "coral", "--apply"])
     run(["train.py", "--task", "coral", "--model", "all", "--strategy", "feature_extraction", "--platform", "lightning"])
     print(">>> E1 done. Re-run this notebook to continue with E2.")
-elif not done("coral", "efficientnet_b0", "finetune"):
+elif not any((Path("runs") / "coral" / d.name / "manifest.json").exists()
+             for d in Path("runs").glob("coral/*_finetune")):
     import pandas as pd
     lb = pd.read_csv("results/coral/model_leaderboard.csv")
-    top2 = lb.nlargest(2, "weighted_f1")["model"].tolist()
-    for model in top2:
-        if not done("coral", model, "finetune"):
-            run(["train.py", "--task", "coral", "--model", model, "--strategy", "finetune", "--platform", "lightning"])
-    print(">>> E2 done. Re-run this notebook to continue with E3.")
+    fe = lb[lb["strategy"] == "feature_extraction"]
+    if fe.empty:
+        print(">>> No FE rows in the coral leaderboard - run E1 first.")
+    else:
+        top2 = fe.nlargest(2, "weighted_f1")["model"].tolist()
+        for model in top2:
+            if not done("coral", model, "finetune"):
+                run(["train.py", "--task", "coral", "--model", model, "--strategy", "finetune", "--platform", "lightning"])
+        print(">>> E2 done. Re-run this notebook to continue with E3.")
 elif not done("seg", "unet_small", "from_scratch"):
     if not Path("datasets/deepfish/DeepFish").exists():
         run(["download_data.py", "--dataset", "deepfish"])
@@ -223,15 +231,19 @@ elif not done("fish", "resnet34", "feature_extraction"):
     run(["clean_data.py", "--dataset", "fishnet", "--apply"])
     run(["train.py", "--task", "fish", "--model", "all", "--strategy", "feature_extraction", "--platform", "lightning"])
     print(">>> E4 done. Re-run this notebook to continue with E5.")
-elif not done("fish", "resnet34", "finetune"):
+elif not any((Path("runs") / "fish" / d.name / "manifest.json").exists()
+             for d in Path("runs").glob("fish/*_finetune")):
     import pandas as pd
     lb = pd.read_csv("results/fish/model_leaderboard.csv")
     fe = lb[lb["strategy"] == "feature_extraction"]
-    winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
-    if not done("fish", winner, "finetune"):
-        run(["train.py", "--task", "fish", "--model", winner, "--strategy", "finetune", "--platform", "lightning"])
-    run(["evaluate.py", "--task", "fish"])
-    print(">>> E5 done.")
+    if fe.empty:
+        print(">>> No FE rows in the fish leaderboard - run E4 first.")
+    else:
+        winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
+        if not done("fish", winner, "finetune"):
+            run(["train.py", "--task", "fish", "--model", winner, "--strategy", "finetune", "--platform", "lightning"])
+        run(["evaluate.py", "--task", "fish"])
+        print(">>> E5 done. Re-run this notebook to confirm ALL EXPERIMENTS COMPLETE.")
 else:
     print("ALL EXPERIMENTS COMPLETE — run the export cell below.")"""),
         code("""# --- 3. Save: ledger + artifact zip -----------------------------------------

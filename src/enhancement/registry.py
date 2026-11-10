@@ -20,7 +20,13 @@ def register(cls: Type[Enhancer]) -> Type[Enhancer]:
 def get_enhancer(name: str, params: dict | None = None) -> Enhancer:
     """Instantiate a registered enhancer by name (lazily importing built-ins)."""
     if not ENHANCER_REGISTRY:
-        from . import strategies  # noqa: F401  (registers all built-ins)
+        try:
+            from . import strategies  # noqa: F401  (registers all built-ins)
+        except Exception:
+            # A strategy module failed mid-import; drop the partial registry so
+            # the next call retries the full import instead of staying crippled.
+            ENHANCER_REGISTRY.clear()
+            raise
     if name not in ENHANCER_REGISTRY:
         raise KeyError(f"Unknown enhancer '{name}'. Available: {sorted(ENHANCER_REGISTRY)}")
     return ENHANCER_REGISTRY[name](params)

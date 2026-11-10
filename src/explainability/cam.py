@@ -69,6 +69,10 @@ class CAMMethod(ABC):
 
     # Context manager sugar
     def __enter__(self) -> "CAMMethod":
+        # Re-register the hook — release() after a previous use removed it, so
+        # instances reused across frames (realtime pipeline) stay functional.
+        if self._handle is None:
+            self._handle = self.target_layer.register_forward_hook(self._save_activation)
         return self
 
     def __exit__(self, *exc) -> None:

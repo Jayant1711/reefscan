@@ -345,7 +345,7 @@ class ReefScanPipeline:
             "video_out": str(out_path) if out_path else None,
         }
         if rows:
-            csv_path = (Path(out_path).with_suffix("") if out_path else Path("results/realtime/frame_log")).with_suffix(".csv")
+            csv_path = (Path(out_path).with_suffix("") if out_path else Path(self.cfg.paths.results_dir) / "realtime" / "frame_log").with_suffix(".csv")
             csv_path.parent.mkdir(parents=True, exist_ok=True)
             pd.DataFrame(rows).to_csv(csv_path, index=False)
             summary["frame_log"] = str(csv_path)

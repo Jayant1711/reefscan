@@ -34,6 +34,18 @@ class SurveyAnalytics:
     coral_risk_category: str
     bleached_frame_fraction: float
 
+    def _condition_distribution(self, history: list[float]) -> dict[str, float]:
+        """Proxy severity classes from the per-frame BSI history."""
+        from collections import Counter
+
+        from ..coral_analysis.severity import index_to_class_strict
+
+        thresholds = tuple(self.cfg.coral.severity.thresholds) if self.cfg else (15, 35, 60, 85)
+        counts = Counter(index_to_class_strict(v, thresholds) for v in history)
+        total = sum(counts.values()) or 1
+        return {c: counts.get(c, 0) / total for c in
+                ("healthy", "mild", "moderate", "severe", "dead")}
+
     def to_dict(self) -> dict:
         return {
             "biodiversity": self.biodiversity,
@@ -57,7 +69,9 @@ class SurveyAnalytics:
                 "ewma_last": self.trend.ewma_last,
                 "slope_per_step": self.trend.slope_per_step,
                 "trend_label": self.trend.trend_label,
+                "history": list(self.trend.history),
             },
+            "condition_distribution": self.condition_distribution,
             "env_risk": {
                 "score": self.env_risk.score,
                 "category": self.env_risk.category,
@@ -99,9 +113,11 @@ class SurveyAnalyzer:
         # ---- coral severity & trend
         bsi_values = [a.coral.assessment.index for a in analyses if a.coral is not None]
         mean_bsi = float(np.mean(bsi_values)) if bsi_values else 0.0
-        bleached_frames = [a for a in analyses if a.coral is not None and a.coral.assessment.index >= 15]
+        mild_cut = float((self.cfg.coral.severity.thresholds[0] if self.cfg else 15))
+        bleached_frames = [a for a in analyses if a.coral is not None and a.coral.assessment.index >= mild_cut]
         bleached_frac = len(bleached_frames) / max(1, len(bsi_values))
         trend = severity_trend_summary(analyses, getattr(self.cfg.analytics, "trend_ewma_alpha", 0.3) if self.cfg else 0.3)
+        self.condition_distribution = self._condition_distribution(trend.history)
 
         # ---- environment
         images = list(source_images) if source_images is not None else []

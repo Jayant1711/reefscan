@@ -38,11 +38,13 @@ class BBox:
         return [self.x1, self.y1, self.x2, self.y2, self.score]
 
     def iou(self, other: "BBox") -> float:
+        """Rectangle IoU. ``area`` is the component pixel count (sorting only) —
+        mixing it with rectangle intersections over-estimated IoU badly."""
         ix1, iy1 = max(self.x1, other.x1), max(self.y1, other.y1)
         ix2, iy2 = min(self.x2, other.x2), min(self.y2, other.y2)
         iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
         inter = iw * ih
-        union = self.area + other.area - inter
+        union = (self.w * self.h) + (other.w * other.h) - inter
         return inter / union if union > 0 else 0.0
 
 

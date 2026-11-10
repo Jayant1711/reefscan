@@ -44,20 +44,32 @@ DEFAULT_VERSION = "v0.1.2"
 
 
 def _download(url: str, dest: Path) -> Path:
-    """Download ``url`` to ``dest`` with curl (resumable, no quota limits)."""
-    if dest.exists():
+    """Download ``url`` to ``dest`` with curl (resumable, quota-free, verified)."""
+    import subprocess
+    import zipfile as _zf
+
+    if dest.exists() and not _zf.is_zipfile(dest):
+        # A previous transfer died mid-flight (HTTP error body / partial bytes):
+        # keep the partial file so curl -C - can resume from it.
+        logger.warning("Partial/invalid archive at %s — resuming download.", dest)
+    elif dest.exists():
         logger.info("Archive already present: %s — skipping download.", dest)
         return dest
     logger.info("Downloading %s -> %s", url, dest)
-    import subprocess
-
-    # curl -C - resumes partial downloads; Colab images ship curl.
+    # -f makes HTTP errors (403/404/S3 XML) exit non-zero instead of writing the
+    # error body to dest; -C - resumes a partial file; --retry tolerates blips.
     result = subprocess.run(
-        ["curl", "-L", "-C", "-", "--retry", "3", "-o", str(dest), url],
+        ["curl", "-fL", "-C", "-", "--retry", "3", "--connect-timeout", "30",
+         "-o", str(dest), url],
         check=False,
     )
     if result.returncode != 0 or not dest.exists():
         raise RuntimeError(f"Download failed for {url} (curl exit {result.returncode})")
+    if not _zf.is_zipfile(dest):
+        dest.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Downloaded file from {url} is not a valid zip — deleted it; re-run to resume."
+        )
     return dest
 
 
@@ -78,7 +90,8 @@ def download_fishnet(
     labels_zip = raw_dir / f"fishnet_{version}_labels.zip"
     extracted = raw_dir / "FishNet"
 
-    if extracted.exists() and any(extracted.iterdir()):
+    sentinel = raw_dir / "_EXTRACTED"
+    if sentinel.exists():
         logger.info("FishNet already extracted at %s — skipping.", extracted)
         return extracted
 
@@ -92,6 +105,7 @@ def download_fishnet(
     logger.info("Extracting FishNet images (this can take several minutes) ...")
     with zipfile.ZipFile(images_zip) as zf:
         zf.extractall(raw_dir)
+    sentinel.write_text("ok\n", encoding="utf-8")  # marks a COMPLETE extraction
 
     if not keep_archive:
         for archive in (images_zip, labels_zip):

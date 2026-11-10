@@ -2,22 +2,30 @@
 
 Three public, free datasets drive the system. `python download_data.py` fetches all of them.
 
-## 1. FishNet (ICCV 2023) — species classification
-- **Site:** https://fishnet-2023.github.io/ · **Paper:** Khan et al., ICCV 2023
-- **Scale:** 94,532 images, 17,357 aquatic species, taxonomy-organised (order/family/genus/species)
-- **Download:** official Google Drive archive (~15 GB) — handled automatically by `src/data/downloaders/fishnet.py` (gdown)
-- **Manual fallback:** open https://drive.google.com/file/d/1mqLoap9QIVGYaPJ7T_KSBfLxJOg2yFY3/view in a browser, place the zip at `datasets/fishnet/raw/FishNet.zip`, re-run `python download_data.py --dataset fishnet` (extraction resumes).
+## 1. fishnet.ai v0.1.2 (The Nature Conservancy) — fish species from bbox crops
+- **Site:** https://www.fishnet.ai/download · **Paper:** arXiv:2106.09178
+- **Download:** official S3 mirror (quota-free, resumable): images 5.7 GB + labels 2.1 MB
+  (`https://fishnet-data.s3-us-west-1.amazonaws.com/foid_{images,labels}_v012.zip`) —
+  fetched by `src/data/downloaders/fishnet.py` via `curl -f -C -`.
+- **VERIFIED labels schema** (`foid_labels_bbox_v012.csv`):
+  `img_id, bbox_id, x_min, x_max, y_min, y_max, label_l1, label_l2` —
+  159,119 boxes over 34,987 frames; 28 `label_l1` classes (Albacore 33.9K,
+  Yellowfin tuna 6.7K, …, `Human` 104K), 13 `label_l2` codes.
+  No split column in v0.1.2 → `prepare_fishnet.py` derives a seeded
+  **image-level** 80/10/10 split (all crops of one frame share a split — no leakage).
 
-### Curated subset (why and how)
-Training 17k species on free compute is infeasible, so `prepare_fishnet.py` builds a
-**taxonomy-level subset** (default: `family`, top-25 classes with ≥60 train images):
+### Curated crop subset (why and how)
+Classification trains on **cropped fish regions** (matching the real-time pipeline):
+`Human`/`Unknown`/`No fish` rows are excluded; classes with <100 boxes dropped;
+top-12 kept (config: `fish.prepare.{level, top_k, min_images_per_class,
+exclude_classes, split_fractions}`). Output:
 
 ```
-datasets/fishnet/curated/train/<CLASS>/*.jpg
-datasets/fishnet/curated/validation/<CLASS>/*.jpg
-datasets/fishnet/curated/test/<CLASS>/*.jpg
+datasets/fishnet/curated/<split>/<CLASS>/<img_id>_bbox<id>.jpg
 ```
-Tune via config: `fish.prepare.{level, top_k, min_images_per_class}`.
+
+A `_COMPLETE` marker guards against partial runs: interrupted preparations resume
+per-crop, never silently train on a truncated set.
 
 ## 2. DeepFish (Scientific Reports 2020) — fish presence & segmentation
 - **Site:** https://alzayats.github.io/DeepFish/ · **Mirror:** HF `Alzayats/DeepFish`
@@ -45,8 +53,8 @@ textured mini-datasets that make every pipeline stage verifiable in minutes on C
 ## 5. Expected disk usage
 | Dataset | Size | Needed for |
 |---|---|---|
-| FishNet raw | ~15 GB | species classification |
-| FishNet curated | ~1–2 GB | (subset kept after prepare) |
+| fishnet.ai raw | ~5.7 GB images + 2.1 MB labels | species classification |
+| fishnet.ai curated crops | ~1–2 GB | (crops kept after prepare) |
 | DeepFish | ~7.1 GB | segmentation / boxes |
 | NOAA coral | ~770 MB | coral analysis |
 | Synthetic | ~20 MB | smoke test / demo |

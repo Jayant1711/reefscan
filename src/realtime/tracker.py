@@ -31,11 +31,19 @@ class CentroidTracker:
         self.max_disappeared = int(max_disappeared)
         self.min_distance = float(min_distance)
         self.tracks: dict[int, Track] = {}
+        # Species of tracks that left the frame — kept so end-of-video
+        # statistics count every individual ever seen, not just live ones.
+        self.retired_counts: dict[str, int] = {}
         self._next_id = 1
 
     def update(self, detections: list[BBox], frame_idx: int = 0,
                species_by_box: list[tuple[str, float]] | None = None) -> list[Track]:
         """Update tracks from current detections; returns live tracks."""
+        if not detections:
+            # Age + retire stale tracks even on empty frames, then return.
+            self._drop_stale()
+            return list(self.tracks.values())
+
         centroids = [(d.cx, d.cy) for d in detections]
 
         # Age existing tracks.
@@ -53,10 +61,10 @@ class CentroidTracker:
             for _ in range(min(len(track_ids), len(centroids))):
                 if dist_matrix.size == 0:
                     break
-                i, j = np.unravel_index(np.nanargmin(np.where(dist_matrix <= self.min_distance, dist_matrix, np.nan)),
-                                        dist_matrix.shape) if np.isfinite(dist_matrix).any() else (0, 0)
-                if not np.isfinite(dist_matrix[i, j]) or dist_matrix[i, j] > self.min_distance:
-                    break
+                masked = np.where(dist_matrix <= self.min_distance, dist_matrix, np.nan)
+                if not np.isfinite(masked).any():
+                    break  # every remaining pair is beyond min_distance
+                i, j = np.unravel_index(np.nanargmin(masked), masked.shape)
                 tid = track_ids[i]
                 track = self.tracks[tid]
                 track.centroid = centroids[j]
@@ -79,12 +87,15 @@ class CentroidTracker:
             )
             self._next_id += 1
 
-        # Drop stale tracks.
+        self._drop_stale()
+        return list(self.tracks.values())
+
+    def _drop_stale(self) -> None:
+        """Remove stale tracks, remembering their species for final counts."""
         dead = [tid for tid, t in self.tracks.items() if t.disappeared > self.max_disappeared]
         for tid in dead:
-            del self.tracks[tid]
-
-        return list(self.tracks.values())
+            track = self.tracks.pop(tid)
+            self.retired_counts[track.species] = self.retired_counts.get(track.species, 0) + 1
 
     @property
     def unique_count(self) -> int:
@@ -92,8 +103,12 @@ class CentroidTracker:
         return self._next_id - 1
 
     def species_counts(self) -> dict[str, int]:
-        """Unique tracks per species (population statistics input)."""
-        counts: dict[str, int] = {}
+        """Unique tracks per species (population statistics input).
+
+        Includes retired (left-the-frame) tracks so end-of-video statistics
+        count every individual, not just the ones still on screen.
+        """
+        counts = dict(self.retired_counts)
         for track in self.tracks.values():
             counts[track.species] = counts.get(track.species, 0) + 1
         return counts

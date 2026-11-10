@@ -36,6 +36,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image", default=None, help="Image for --xai")
     parser.add_argument("--xai-task", default="fish", choices=["fish", "coral"],
                         help="Which trained classifier the XAI grid uses (default fish)")
+    parser.add_argument("--platform", default=None,
+                        choices=["kaggle", "colab", "lightning", "local"],
+                        help="Platform profile: aligns dataset paths with train.py --platform")
     parser.add_argument("--config", default=None)
     parser.add_argument("--set", nargs="*", default=[])
     return parser.parse_args()
@@ -148,6 +151,13 @@ def run_xai_cli(cfg, image_path: str, device, task: str = "fish") -> None:
 def main() -> int:
     args = parse_args()
     cfg = load_config(args.config)
+    if args.platform:
+        overlay = Path(__file__).resolve().parent / "configs" / "platform" / f"{args.platform}.yaml"
+        if overlay.exists():
+            from src.config import merge_config_file
+
+            merge_config_file(cfg, overlay)
+            logger.info("Applied platform profile: %s", overlay.name)
     override_from_args(cfg, args)
     setup_logging(level=cfg.logging.level, log_file=cfg.logging.file)
     ensure_output_dirs(cfg)

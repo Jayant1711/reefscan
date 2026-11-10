@@ -40,16 +40,15 @@ class Enhancer(ABC):
         if image is None or image.ndim != 3 or image.shape[2] != 3:
             raise ValueError("Enhancers expect a 3-channel BGR image.")
         if image.dtype != np.uint8:
+            # Float images in [0,1] are scaled up; float [0,255] are clipped.
+            if np.issubdtype(image.dtype, np.floating) and image.max() <= 1.0 + 1e-6:
+                image = image * 255.0
             image = np.clip(image, 0, 255).astype(np.uint8)
         return image
 
     @staticmethod
     def _to_float(image: np.ndarray) -> np.ndarray:
         return image.astype(np.float32) / 255.0
-
-    @staticmethod
-    def _clip_uint8(image: np.ndarray) -> np.ndarray:
-        return np.clip(image * 255.0 if image.max() <= 1.0 + 1e-6 and image.dtype != np.uint8 else image, 0, 255).astype(np.uint8)
 
     def __repr__(self) -> str:  # pragma: no cover - cosmetic
         return f"<Enhancer {self.name}>"

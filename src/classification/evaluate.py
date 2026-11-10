@@ -50,6 +50,12 @@ def run_model_evaluation(
         raise FileNotFoundError(f"No test/validation split under {data_dir}")
 
     model, ckpt = _load_checkpoint_model(model_dir, bundle.num_classes, device)
+    ckpt_classes = int(ckpt.get("num_classes", bundle.num_classes))
+    if ckpt_classes != bundle.num_classes:
+        raise ValueError(
+            f"Checkpoint {model_dir / 'best.pt'} has {ckpt_classes} classes but the dataset "
+            f"at {data_dir} has {bundle.num_classes} — dataset changed since training."
+        )
     metrics = evaluate_model_loader(model, eval_loader, device, bundle.num_classes)
 
     # Persist headline metrics (drop bulky per-sample arrays).
@@ -136,7 +142,13 @@ def build_leaderboard(
             continue
         m = load_json(metrics_path)
         # Strategy + params + train time from best_meta.json / history.csv.
-        meta = load_json(Path(models_dir) / task_name / name / "best_meta.json") or {}
+        meta_path = Path(models_dir) / task_name / name / "best_meta.json"
+        meta = {}
+        if meta_path.exists():
+            try:
+                meta = load_json(meta_path) or {}
+            except Exception:
+                meta = {}
         params = meta.get("params") or {}
         strategy = meta.get("strategy", "finetune")
         params_m = round(params.get("params_total", 0) / 1e6, 2)
@@ -161,13 +173,14 @@ def build_leaderboard(
     if not rows:
         raise FileNotFoundError(f"No evaluation results under {results_dir}/{task_name}")
 
-    df = pd.DataFrame(rows).sort_values(metric_for_best, ascending=False).reset_index(drop=True)
+    rank_metric = metric_for_best.replace("val_", "")
+    df = pd.DataFrame(rows).sort_values(rank_metric, ascending=False).reset_index(drop=True)
     out_dir = ensure_dir(Path(results_dir) / task_name)
     df.to_csv(out_dir / "model_leaderboard.csv", index=False)
     best = str(df.iloc[0]["model"])
 
     save_json(
-        {"task": task_name, "best_model": best, "metric_for_best": metric_for_best,
+        {"task": task_name, "best_model": best, "metric_for_best": rank_metric,
          "leaderboard": df.to_dict(orient="records")},
         Path(models_dir) / task_name / "best_model.json",
     )

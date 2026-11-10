@@ -147,7 +147,7 @@ def evaluate_enhancement(original: np.ndarray, enhanced: np.ndarray) -> dict[str
     PSNR/SSIM compare enhanced against the original capture (restoration
     proximity); UCIQE/UIQM are no-reference quality scores of the enhanced
     image. ``uciqe_orig`` / ``uiqm_orig`` are included so relative gain can be
-    reported (``delta_uiqm`` etc.).
+    reported.
     """
     return {
         "psnr": psnr(original, enhanced),

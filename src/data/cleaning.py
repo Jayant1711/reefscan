@@ -113,13 +113,23 @@ def scan_imagefolder(root: str | Path, min_size: int = MIN_IMAGE_SIZE) -> dict:
         if dhash:
             dhash_index.setdefault(dhash, []).append(path)
 
+    split_rank = {"train": 0, "validation": 1, "val": 1, "test": 2}
+
+    def _ordered(paths: list[Path]) -> list[Path]:
+        """train copy first, then val, then test — quarantine never eats train data."""
+        return sorted(paths, key=lambda p: split_rank.get(_split_of(p, root), 3))
+
     report["duplicate_groups"].extend(
-        {"kind": "md5", "hash": h, "paths": [str(p) for p in paths]}
+        {"kind": "md5", "hash": h, "paths": [str(p) for p in _ordered(paths)]}
         for h, paths in md5_index.items() if len(paths) > 1
     )
+    # Near-dup scan excludes files already grouped as exact duplicates, so one
+    # redundant file is counted once, not twice.
+    md5_dupes = {p for paths in md5_index.values() if len(paths) > 1 for p in paths}
     report["duplicate_groups"].extend(
-        {"kind": "dhash", "hash": h, "paths": [str(p) for p in paths]}
+        {"kind": "dhash", "hash": h, "paths": [str(p) for p in _ordered(paths)]}
         for h, paths in dhash_index.items() if len(paths) > 1
+        and not set(paths) <= md5_dupes
     )
 
     # Leakage: identical dHash present in 2+ splits.
@@ -130,7 +140,7 @@ def scan_imagefolder(root: str | Path, min_size: int = MIN_IMAGE_SIZE) -> dict:
             hash_splits[h] = splits
     report["leakage_groups"] = [
         {"hash": h, "splits": sorted(s),
-         "paths": [str(p) for p in dhash_index[h]]}
+         "paths": [str(p) for p in _ordered(dhash_index[h])]}
         for h, s in hash_splits.items()
     ]
 
@@ -139,7 +149,7 @@ def scan_imagefolder(root: str | Path, min_size: int = MIN_IMAGE_SIZE) -> dict:
         "corrupt": len(report["corrupt"]),
         "too_small": len(report["too_small"]),
         "duplicate_images": sum(len(g["paths"]) - 1 for g in report["duplicate_groups"]),
-        "leaked_images": sum(len(g["paths"]) for g in report["leakage_groups"]),
+        "leaked_images": sum(len(g["paths"]) - 1 for g in report["leakage_groups"]),
     }
     logger.info("Scan %s: %s", root.name, report["counts"])
     return report
@@ -196,24 +206,6 @@ def scan_segmentation_pairs(data_dir: str | Path, min_fraction: float = MIN_MASK
 
 
 # ---------------------------------------------------------------- quarantine
-def _flagged_paths(report: dict) -> list[Path]:
-    flagged: list[str] = (
-        report.get("corrupt", [])
-        + report.get("too_small", [])
-        + report.get("corrupt_images", [])
-        + report.get("corrupt_masks", [])
-        + report.get("empty_masks", [])
-    )
-    paths = [Path(item.split(" (foreground")[0]) for item in flagged]
-    # Duplicate / leakage groups: keep the first file, flag the rest.
-    for group in report.get("duplicate_groups", []):
-        paths.extend(Path(p) for p in group["paths"][1:])
-    for group in report.get("leakage_groups", []):
-        # Keep the first split's copy; flag later splits' copies.
-        paths.extend(Path(p) for p in group["paths"][1:])
-    return [p for p in paths if p.exists()]
-
-
 def apply_quarantine(root: str | Path, report: dict) -> list[str]:
     """Move flagged files into ``<root>/_quarantine/<reason>/`` (non-destructive)."""
     root = Path(root)
@@ -246,8 +238,10 @@ def _move_to_quarantine(root: Path, path: Path, reason: str) -> str:
     # Flatten but keep uniqueness: split dirs in the filename.
     safe_name = "_".join(path.relative_to(root).parts)
     target = target_dir / safe_name
-    if target.exists():
-        target = target_dir / f"{path.stem}_2{path.suffix}"
+    counter = 2
+    while target.exists():
+        target = target_dir / f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
     shutil.move(str(path), str(target))
     return str(target)
 

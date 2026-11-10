@@ -78,13 +78,19 @@ def apply_platform(cfg, platform: str | None):
 def main() -> int:
     args = parse_args()
     cfg = load_config(args.config)
+    setup_logging(level=cfg.logging.level, log_file=cfg.logging.file)
     apply_platform(cfg, args.platform)
     override_from_args(cfg, args)
-    setup_logging(level=cfg.logging.level, log_file=cfg.logging.file)
 
     recipe = RECIPES[args.dataset]
     target = recipe["dir"](cfg)
     report_path = Path(cfg.paths.results_dir) / "cleaning" / f"{args.dataset}_cleaning_report.json"
+    if not target.exists():
+        logger.error(
+            "Dataset directory %s does not exist — run `python download_data.py --dataset %s` first.",
+            target, args.dataset if args.dataset != "fishnet" else "fishnet (+ --prepare-fishnet)",
+        )
+        return 2
     logger.info("Cleaning %s dataset at %s (apply=%s)", args.dataset, target, args.apply)
 
     if recipe["kind"] == "imagefolder":
@@ -93,6 +99,9 @@ def main() -> int:
             _audit_classes(target, report)
     else:
         report = clean_segmentation(target, apply=args.apply, report_path=report_path)
+        if report.get("pairs_found", 0) == 0:
+            logger.error("No image/mask pairs found under %s — DeepFish not fully extracted?", target)
+            return 2
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as fh:

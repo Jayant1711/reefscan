@@ -65,9 +65,11 @@ def demo_warning_banner() -> None:
             "research-grade results (see `docs/TRAINING.md`).",
             icon="⚠️",
         )
-    if status.get("fish") == "missing":
-        st.error(
-            "No fish model found. Run `python run_smoke_test.py` (instant demo) or "
-            "`python train.py --task fish --model resnet34` (real training).",
-            icon="🚨",
-        )
+    for task in ("fish", "coral"):
+        if status.get(task) == "missing":
+            st.error(
+                f"No {task} model found. Run `python run_smoke_test.py` (instant demo) or "
+                f"`python train.py --task {task} --model resnet34` (real training). "
+                "Pages that need this model are disabled until then.",
+                icon="🚨",
+            )

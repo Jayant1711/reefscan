@@ -54,8 +54,8 @@ def collect_rows() -> list[dict]:
             "macro_ap": metrics.get("macro_ap"),
             "macro_f1": metrics.get("macro_f1"),
             "weighted_f1": metrics.get("weighted_f1"),
-            "iou": metrics.get("iou"),
-            "dice": metrics.get("dice"),
+            "iou": metrics.get("iou", metrics.get("best_val_iou")),
+            "dice": metrics.get("dice", metrics.get("best_val_dice")),
             "box_ap50": metrics.get("box_ap50"),
             "pixel_ap": metrics.get("pixel_ap"),
         })

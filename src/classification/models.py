@@ -104,12 +104,13 @@ def param_groups(model: nn.Module, lr: float, head_lr_multiplier: float = 10.0) 
     return groups
 
 
-# Last-stage module per backbone (used by partial fine-tuning).
+# Final stage per backbone (verified param-name prefixes on torchvision).
+# ConvNeXt has NO top-level `stages` — stages live at features.1/3/5/7.
 _LAST_STAGE = {
     "resnet34": "layer4",
-    "efficientnet_b0": "features.6",
-    "mobilenet_v3": "features.10",
-    "convnext_tiny": "stages.3",
+    "efficientnet_b0": "features.7",
+    "mobilenet_v3": "features.12",
+    "convnext_tiny": "features.7",
 }
 
 

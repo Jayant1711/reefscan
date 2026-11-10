@@ -68,7 +68,8 @@ def marine_biodiversity_score(
                 "gini_simpson": 0.0, "margalef": 0.0, "n_species": 0, "n_individuals": 0}
 
     h = shannon_index(counts)
-    h_ref = np.log(max(2, min(shannon_ref_classes, max(len(counts), 2))))
+    # Documented formula: H' / ln(S_ref) with S_ref = 25 (RESEARCH_METHODOLOGY.md).
+    h_ref = np.log(max(2, shannon_ref_classes))
     h_norm = h / h_ref
 
     gs = gini_simpson_index(counts)
