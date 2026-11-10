@@ -33,6 +33,14 @@ def _imagefolder_ready(root: Path, min_images: int = 100) -> bool:
     total = sum(1 for _ in root.rglob("*.jpg")) + sum(1 for _ in root.rglob("*.png"))
     if total < min_images:
         return False
+    # Healing a pre-marker dataset requires ALL splits populated - an
+    # interrupted write that reached min_images total must NOT self-heal.
+    splits = {
+        d.name for d in root.iterdir() if d.is_dir()
+        and (any(d.rglob("*.jpg")) or any(d.rglob("*.png")))
+    }
+    if not {"train", "test"} <= splits or not (splits & {"validation", "val"}):
+        return False
     if not (root.parent / "_COMPLETE").exists():
         (root.parent / "_COMPLETE").write_text("ok\n", encoding="utf-8")
     return True

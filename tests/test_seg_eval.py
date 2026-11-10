@@ -97,7 +97,7 @@ def test_evaluate_segmentation_writes_metrics(synthetic_seg_env, tmp_path):
     from src.segmentation.evaluate_seg import evaluate_segmentation
 
     metrics = evaluate_segmentation(
-        models_dir=ckpt_dir.parent.parent,   # repo-style models/ dir
+        models_dir=ckpt_dir.parent,          # repo-style models/ dir (root/models)
         results_dir=tmp_path / "results",
         device=device,
         data_dir=root,
