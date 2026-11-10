@@ -312,39 +312,42 @@ class ReefScanPipeline:
         frame_idx = processed = 0
         t_start = time.perf_counter()
 
-        while True:
-            ok, frame = capture.read()
-            if not ok or (max_frames and processed >= max_frames):
-                break
-            if frame_idx % frame_skip == 0:
-                analysis = self.analyze_image(frame, frame_idx=frame_idx, track=True)
-                if analysis.coral is not None:
-                    trend.update(analysis.coral.assessment.index)
-                annotated = annotate_frame(
-                    frame, analysis.detections,
-                    analysis.coral.assessment if analysis.coral else None,
-                    analysis.heatmap,
-                    fps=None, frame_idx=frame_idx,
-                )
-                if writer is not None:
-                    writer.write(annotated)
-                if display:
-                    cv2.imshow("ReefScan AI", annotated)
-                    if cv2.waitKey(1) & 0xFF == ord("q"):
-                        break
-                rows.append({
-                    "frame": frame_idx,
-                    "n_fish": len(analysis.detections),
-                    "dominant_species": analysis.dominant_species or "",
-                    "best_confidence": max((d.confidence for d in analysis.detections), default=0.0),
-                    "coral_class": analysis.coral.assessment.class_name if analysis.coral else "",
-                    "bsi": analysis.coral.assessment.index if analysis.coral else np.nan,
-                    "unique_fish_so_far": self.tracker.unique_count,
-                })
-                processed += 1
-                if progress_cb:
-                    progress_cb(frame_idx, total)
-            frame_idx += 1
+        try:
+            while True:
+                ok, frame = capture.read()
+                if not ok or (max_frames and processed >= max_frames):
+                    break
+                if frame_idx % frame_skip == 0:
+                    analysis = self.analyze_image(frame, frame_idx=frame_idx, track=True)
+                    if analysis.coral is not None:
+                        trend.update(analysis.coral.assessment.index)
+                    annotated = annotate_frame(
+                        frame, analysis.detections,
+                        analysis.coral.assessment if analysis.coral else None,
+                        analysis.heatmap,
+                        fps=None, frame_idx=frame_idx,
+                    )
+                    if writer is not None:
+                        writer.write(annotated)
+                    if display:
+                        cv2.imshow("ReefScan AI", annotated)
+                        if cv2.waitKey(1) & 0xFF == ord("q"):
+                            break
+                    rows.append({
+                        "frame": frame_idx,
+                        "n_fish": len(analysis.detections),
+                        "dominant_species": analysis.dominant_species or "",
+                        "best_confidence": max((d.confidence for d in analysis.detections), default=0.0),
+                        "coral_class": analysis.coral.assessment.class_name if analysis.coral else "",
+                        "bsi": analysis.coral.assessment.index if analysis.coral else np.nan,
+                        "unique_fish_so_far": self.tracker.unique_count,
+                    })
+                    processed += 1
+                    if progress_cb:
+                        progress_cb(frame_idx, total)
+                frame_idx += 1
+        finally:
+            self._suppress_tracker_reset = False
 
         capture.release()
         if writer is not None:
