@@ -39,14 +39,20 @@ def notebook(cells: list[dict], name: str) -> dict:
     }
 
 
-SETUP_COMMON = f"""# --- 0. Clone the repo + install dependencies ------------------------------
-!git clone {REPO_URL} REPO_DIR
-%cd REPO_DIR
+SETUP_COMMON = f"""# --- 0. Clone (or update) the repo + install dependencies ------------------
+# Re-runs auto-update the code (git pull) while PRESERVING your trained
+# artefacts inside the clone — never re-download, never lose checkpoints.
+import os
+repo = "REPO_DIR"
+if not os.path.exists(repo):
+    !git clone {REPO_URL} {{repo}}
+else:
+    !git -C {{repo}} pull --ff-only
+%cd {{repo}}
 !pip install -q -r requirements.txt
 
-import os
-if os.path.basename(os.getcwd()) != os.path.basename("REPO_DIR"):
-    os.chdir("REPO_DIR")  # kernel restarts land elsewhere — re-enter the repo"""
+if os.path.basename(os.getcwd()) != os.path.basename(repo):
+    os.chdir(repo)  # kernel restarts land elsewhere — re-enter the repo"""
 
 GPU_CHECK = """# --- 1. GPU + test-suite check (fails loudly if anything is broken) --------
 import torch, subprocess, sys
