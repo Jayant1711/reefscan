@@ -34,6 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data", default=None, help="Image folder for the enhancement benchmark")
     parser.add_argument("--xai", action="store_true", help="Generate XAI grid for --image")
     parser.add_argument("--image", default=None, help="Image for --xai")
+    parser.add_argument("--xai-task", default="fish", choices=["fish", "coral"],
+                        help="Which trained classifier the XAI grid uses (default fish)")
     parser.add_argument("--config", default=None)
     parser.add_argument("--set", nargs="*", default=[])
     return parser.parse_args()
@@ -114,14 +116,14 @@ def _guess_sample_folder(cfg) -> Path:
     return Path("datasets/fishnet/curated/train")
 
 
-def run_xai_cli(cfg, image_path: str, device) -> None:
+def run_xai_cli(cfg, image_path: str, device, task: str = "fish") -> None:
     import torch
 
     from src.explainability.visualize import generate_xai_grid
     from src.realtime.pipeline import load_best_classifier
 
     model, class_names, _src, img_size = load_best_classifier(
-        "fish", cfg.paths.models_dir, device, cfg.paths.demo_dir
+        task, cfg.paths.models_dir, device, cfg.paths.demo_dir
     )
     image = read_image_bgr(image_path)
     import cv2
@@ -158,7 +160,7 @@ def main() -> int:
     if args.xai:
         if not args.image:
             raise ValueError("--xai requires --image <path>")
-        run_xai_cli(cfg, args.image, device)
+        run_xai_cli(cfg, args.image, device, task=args.xai_task)
     if not (args.task or args.enhancement or args.xai):
         logger.info("Nothing to do — pass --task, --enhancement or --xai. See --help.")
     return 0

@@ -87,11 +87,11 @@ def kaggle_cells() -> list[dict]:
         code(setup),
         code(GPU_CHECK),
         code("""# --- 2. Datasets (~8 GB to ephemeral /kaggle/tmp) ---------------------------
-!python download_data.py --dataset coral
-!python download_data.py --dataset deepfish"""),
+!python download_data.py --dataset coral --platform kaggle
+!python download_data.py --dataset deepfish --platform kaggle"""),
         code("""# --- 3. Data cleaning (report + quarantine flagged files) -------------------
 !python clean_data.py --dataset coral --apply --platform kaggle
-!python clean_data.py --dataset seg --apply"""),
+!python clean_data.py --dataset seg --apply --platform kaggle"""),
         code("""# --- 4. E1 — coral feature-extraction screen (all 4 backbones, ~35 min) ----
 !python train.py --task coral --model all --strategy feature_extraction --platform kaggle
 import pandas as pd
@@ -113,8 +113,14 @@ pd.read_csv("results/coral/model_leaderboard.csv")"""),
 !python train.py --task seg --platform kaggle
 !python evaluate.py --task seg
 import json; print(json.dumps(json.load(open("results/seg/metrics.json")), indent=2))"""),
-        code("""# --- 7. WGBS severity demo on the best coral model (Phase-3 innovation) ----
-!python evaluate.py --xai --image $(find /kaggle/tmp/reefscan_data/coral/imagefolders/test -name "*.jpg" | head -1) || true"""),
+        code("""# --- 7. XAI sanity check on the best coral model (Phase-3 innovation) -------
+import glob
+sample = (glob.glob("/kaggle/tmp/reefscan_data/coral/imagefolders/test/*/*.jpg") +
+          glob.glob("datasets/coral/imagefolders/test/*/*.jpg"))
+if sample:
+    !python evaluate.py --xai --xai-task coral --image {sample[0]}
+else:
+    print("No coral test images found — skipping XAI (not fatal).")"""),
         code(EXPORT_KAGGLE),
     ]
 
@@ -131,10 +137,13 @@ def colab_cells() -> list[dict]:
         code(setup),
         code(GPU_CHECK),
         code("""# --- 2. FishNet v0.1.2 from fishnet.ai S3 (5.7 GB) -> bbox crops ----------
-!python download_data.py --dataset fishnet
-!python download_data.py --prepare-fishnet
+!python download_data.py --dataset fishnet --platform colab
+!python download_data.py --prepare-fishnet --platform colab
 import glob
-print("fish crops:", len(glob.glob("/content/reefscan_data/fishnet/curated/*/*.jpg")))"""),
+n_crops = len(glob.glob("/content/reefscan_data/fishnet/curated/*/*/*.jpg"))
+print("fish crops materialized:", n_crops)
+assert n_crops > 1000, "too few crops - re-check the download and prepare cells above"
+"""),
         code("""# --- 3. Data cleaning (corrupt/dup/leakage scan + quarantine) --------------
 !python clean_data.py --dataset fishnet --apply --platform colab"""),
         code("""# --- 4. E4 — fish feature-extraction screen (all 4 backbones, ~1.5 h) ------

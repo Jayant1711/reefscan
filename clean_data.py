@@ -50,14 +50,35 @@ def parse_args() -> argparse.Namespace:
                         help="Which dataset to clean")
     parser.add_argument("--apply", action="store_true",
                         help="Move flagged files to <dataset>/_quarantine/ (default: report only)")
+    parser.add_argument("--platform", default=None,
+                        choices=["kaggle", "colab", "lightning", "local"],
+                        help="Platform profile: aligns dataset paths with train.py --platform")
     parser.add_argument("--config", default=None)
     parser.add_argument("--set", nargs="*", default=[])
     return parser.parse_args()
 
 
+def apply_platform(cfg, platform: str | None):
+    """Merge configs/platform/<name>.yaml (same profiles train.py uses)."""
+    if not platform:
+        return cfg
+    overlay = Path(__file__).resolve().parent / "configs" / "platform" / f"{platform}.yaml"
+    if overlay.exists():
+        from src.config import merge_config_file
+
+        merge_config_file(cfg, overlay)
+        logger.info("Applied platform profile: %s", overlay.name)
+    else:
+        logger.warning("No platform profile at %s — using defaults.", overlay)
+    return cfg
+
+
+
+
 def main() -> int:
     args = parse_args()
     cfg = load_config(args.config)
+    apply_platform(cfg, args.platform)
     override_from_args(cfg, args)
     setup_logging(level=cfg.logging.level, log_file=cfg.logging.file)
 

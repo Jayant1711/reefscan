@@ -33,14 +33,14 @@ GPU runtimes (enable BEFORE running any cell):
 ```bash
 # 0) setup (common first cell above)
 # 1) datasets -> /kaggle/tmp (ephemeral; the 20 GB Output carries only artefacts)
-!python download_data.py --dataset coral
-!python download_data.py --dataset deepfish
+!python download_data.py --dataset coral --platform kaggle
+!python download_data.py --dataset deepfish --platform kaggle
 # FishNet (E4/E5 run on Colab; skip here unless re-assigned):
 # !python download_data.py --dataset fishnet
 
 # 2) clean (report -> quarantine flagged files)
 !python clean_data.py --dataset coral --apply --platform kaggle
-!python clean_data.py --dataset seg --apply
+!python clean_data.py --dataset seg --apply --platform kaggle
 
 # 3) E1 — coral FE screen (all 4 backbones, frozen backbone, ~35 min on T4×2)
 !python train.py --task coral --model all --strategy feature_extraction --platform kaggle
@@ -68,9 +68,9 @@ Download: Kaggle notebook **Output panel** → the `reefscan_artifacts_kaggle_*.
 ```python
 # 0) setup (common first cell above)
 # 1) dataset (FishNet v0.1.2 from the fishnet.ai S3 mirror)
-!python download_data.py --dataset fishnet
-!python download_data.py --prepare-fishnet
-!python clean_data.py --dataset fishnet --apply
+!python download_data.py --dataset fishnet --platform colab
+!python download_data.py --prepare-fishnet --platform colab
+!python clean_data.py --dataset fishnet --apply --platform colab
 
 # 2) E4 — fish FE screen (all 4 backbones, ~1.5 h on T4)
 !python train.py --task fish --model all --strategy feature_extraction --platform colab
