@@ -20,9 +20,9 @@ def test_count_params_exact():
     model = nn.Sequential(nn.Linear(10, 5), nn.Linear(5, 2))  # 55 + 12 = 67
     counts = count_params(model)
     assert counts == {"params_total": 67, "params_trainable": 67}
-    model[1].weight.requires_grad = False
+    model[1].weight.requires_grad = False   # freezes 2x5 = 10 params
     counts = count_params(model)
-    assert counts["params_trainable"] == 55 and counts["params_total"] == 67
+    assert counts["params_trainable"] == 57 and counts["params_total"] == 67
 
 
 def test_detect_platform_returns_known_value():

@@ -27,7 +27,8 @@ python train.py --task fish --model resnet34 --quick
 
 ## 3. Training recipe (why it works on small data)
 - **Transfer learning:** ImageNet init; discriminative LRs (backbone `lr`, fresh head `10×lr`).
-- **Class balancing:** `WeightedRandomSampler` (equal exposure/epoch) + inverse-√ class weights in the loss.
+- **Class balancing:** `WeightedRandomSampler` (equal exposure/epoch) + inverse-√ class weights in the loss. The two compound deliberately — the sampler equalises exposure while the mild inverse-√ tilt counteracts the majority bias of weighted-F1 model selection. The ablation is a flag, not a code edit: `--set fish.loss_class_weight_mode=none` (loss weights off) or `=inverse`.
+- **Validation distribution:** val/test loaders use the *natural* class distribution (the sampler is train-only), so early stopping and every leaderboard number reflect the real-world distribution.
 - **Underwater-aware augmentation:** hue ±0.05 (depth colour drift), saturation/brightness/contrast ±0.3, rotation ±15°, random erasing 0.25; mixup (α=0.2, p=0.5) for fish.
 - **Optimisation:** AdamW, weight-decay 1e-4, cosine schedule with 1 warm-up epoch, label smoothing 0.1, grad-clip 5.0.
 - **Early stopping** on validation weighted-F1 (patience 5); best checkpoint auto-restored.

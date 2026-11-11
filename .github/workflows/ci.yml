@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # ImageNet weights the smoke test downloads (Trainer builds pretrained models).
+      - name: Cache torch-hub checkpoints
+        if: matrix.python-version == '3.11'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/torch/hub/checkpoints
+          key: torch-hub-${{ runner.os }}-v1
+
+      # MUST run before requirements: PyPI's default linux torch wheel is the
+      # CUDA build (~900 MB + ~2.5 GB nvidia deps). The /whl/cpu index gives the
+      # ~190 MB CPU wheel. requirements.txt then sees torch already satisfied.
+      - name: Install CPU-only torch
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project dependencies
+        run: pip install -r requirements.txt -c constraints.txt
+
+      - name: Print resolved versions (audit trail)
+        run: |
+          python -c "import sys, torch, torchvision, numpy, cv2, streamlit, sklearn; \
+            print('python', sys.version.split()[0]); \
+            print('torch', torch.__version__, '| torchvision', torchvision.__version__); \
+            print('numpy', numpy.__version__, '| opencv', cv2.__version__, \
+                  '| streamlit', streamlit.__version__, '| sklearn', sklearn.__version__)"
+
+      - name: Force headless matplotlib
+        run: echo "MPLBACKEND=Agg" >> "$GITHUB_ENV"
+
+      # Unit tests FIRST: test_onnx_export_parity then deterministically skips
+      # (no checkpoints on a fresh checkout). See tests/test_pinning_and_export.py.
+      - name: Unit tests (80)
+        run: python -m pytest tests/ -q --durations=10
+
+      # Full pipeline on synthetic data. Worth it: the only automated exercise
+      # of the training engine, video writer, XAI grids and PDF reports.
+      # ~10-15 min on a 4-core runner; only on 3.11 to bound total wall time.
+      - name: End-to-end smoke test
+        if: matrix.python-version == '3.11'
+        timeout-minutes: 45
+        run: python run_smoke_test.py
+
+      - name: Upload smoke artifacts
+        if: matrix.python-version == '3.11' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reefscan-smoke-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            results/
+            reports/
+          retention-days: 7
+          if-no-files-found: warn

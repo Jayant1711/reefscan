@@ -131,9 +131,17 @@ def train_classifier(task: str, model_name: str, cfg, device: torch.device,
     # Class balancing: inverse-sqrt weights for the loss + weighted sampler already applied.
     from src.classification.class_balancing import class_weights
 
-    weights = torch.tensor(
-        class_weights(bundle.class_counts, mode="inverse_sqrt"), dtype=torch.float32
-    ).to(device)
+    # Sampler + loss-weight double compensation is deliberate (mild inverse-sqrt
+    # tilts gradients toward rare classes while weighted-F1 selection is
+    # majority-biased) — config-gated so the ablation is a --set flag, not a
+    # code edit. See docs/TRAINING.md.
+    loss_weight_mode = section.get("loss_class_weight_mode", "inverse_sqrt")
+    weights = (
+        torch.tensor(class_weights(bundle.class_counts, mode=loss_weight_mode), dtype=torch.float32).to(device)
+        if loss_weight_mode != "none" else None
+    )
+    logger.info("Class balancing: sampler=%s, loss weights=%s",
+                "on" if section.get("augmentation") is not None or True else "off", loss_weight_mode)
 
     train_cfg = TrainConfig.from_cfg(section)
     if task == "coral" and getattr(section, "ordinal_loss", False):

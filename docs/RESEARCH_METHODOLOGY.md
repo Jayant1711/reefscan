@@ -99,13 +99,15 @@ $$\boxed{\ \mathrm{RHS} = 100 - \big(0.60\,\bar\rho + 0.25\,(100\cdot f_{\text{b
 Bands: ≥80 Excellent · ≥60 Good · ≥40 Fair · ≥20 Poor · <20 Critical.
 
 ### 6.3 Population statistics
-Unique-individual counts via tracker IDs; relative abundance $100\,n_i/N$; dominant/rare
-species flags (rare $<1\%$ share); activity profile = detections per frame.
+Detection counts are de-duplicated **within a frame** via tracker IDs; relative abundance
+$100\,n_i/N$; dominant/rare species flags (rare $<1\%$ share); activity profile = detections
+per frame. The same individual recurs across frames and is counted each frame — survey-level
+de-replication (one count per tracked individual across the whole video) is future work.
 
 ### 6.4 Bleaching trend
 Per-observation BSI series $\rho_1..\rho_T$; EWMA $\tilde\rho_t = \alpha\rho_t + (1-\alpha)\tilde\rho_{t-1}$
 ($\alpha=0.3$); OLS slope $\beta$; labels: Improving ($\beta<-2$) · Stable ($|\beta|\le2$) ·
-Declining ($\beta>2$) · Critical ($\bar\rho\ge60 \wedge \beta\ge0$).
+Declining ($\beta>2$) · Critical ($\rho_T\ge60 \wedge \beta\ge0$, with $\rho_T$ the *latest* BSI — the current state, not the series mean).
 
 ### 6.5 Environmental risk
 Turbidity proxy = mean dark channel $/0.35$ (clipped); visibility proxy = RMS contrast $/0.22$ (clipped);
@@ -120,3 +122,5 @@ Bands: <25 Low · <50 Moderate · <75 High · ≥75 Critical.
 3. Dead-coral detection via whiteness is weak when algae overgrowth darkens skeletons; the CNN term mitigates but cannot eliminate this.
 4. Synthetic smoke-test models are for pipeline verification only — never report their metrics as results.
 5. Species classifier is trained on a curated FishNet subset; closed-set assumption (unknown species will be forced into a known class — a rejection head is future work).
+6. FishNet frames come from onboard-camera video with no sequence/clip metadata in the v0.1.2 release: the image-level split eliminates crop-level leakage, but near-duplicate consecutive frames may straddle train/test and inflate species scores. Quantifying sequence-level overlap is future work.
+7. `history.csv` `val_loss` is a class-**weighted** cross-entropy on the natural validation distribution (the loss carries inverse-√ class weights); early stopping uses weighted-F1, so no selection decision is affected.

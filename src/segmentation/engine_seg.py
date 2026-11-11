@@ -102,8 +102,18 @@ def make_seg_loaders(data_dir: str | Path, image_size: int = 256, batch_size: in
             f"Not enough image/mask pairs under {data_dir} to form a training split "
             f"(found {len(pairs)} pair(s)). Download the full DeepFish segmentation set."
         )
+    def _seed_worker(worker_id: int) -> None:
+        """Forked workers inherit the parent numpy RNG — seed them from torch
+        so augmentation coin-flips differ per worker and stay reproducible."""
+        import random
+
+        seed = torch.initial_seed() % 2 ** 32
+        np.random.seed(seed)
+        random.seed(seed)
+
     train_loader = DataLoader(DeepFishSegmentationDataset(train_pairs, image_size, augment=True),
-                              batch_size=batch_size, shuffle=True, num_workers=num_workers)
+                              batch_size=batch_size, shuffle=True, num_workers=num_workers,
+                              worker_init_fn=_seed_worker)
     val_loader = DataLoader(DeepFishSegmentationDataset(val_pairs, image_size, augment=False),
                             batch_size=batch_size, shuffle=False, num_workers=num_workers) if val_pairs else None
     return train_loader, val_loader

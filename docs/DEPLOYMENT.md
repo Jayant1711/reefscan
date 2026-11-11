@@ -14,19 +14,20 @@ Model resolution order (per task): `models/<task>/best_model.json` → any `mode
 (Alternative: `pyngrok` with a free authtoken.)
 
 ## 3. Docker
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 8501
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0"]
-```
+The repo root ships a production `Dockerfile` (CPU-wheel torch ~2.5 GB image,
+non-root user, libglib for OpenCV, healthcheck on Streamlit's `/_stalker/health`)
+plus `docker-compose.yml` with bind-mounts for `models/ results/ reports/`:
+
 ```bash
+docker compose up --build       # dashboard on http://localhost:8501
+# or without compose:
 docker build -t reefscan .
-docker run -p 8501:8501 -v $(pwd)/models:/app/models reefscan
+docker run -p 8501:8501 -v $(pwd)/models:/app/models -v $(pwd)/results:/app/results reefscan
 ```
+
+Note: `provenance.git_sha()` reports `"unknown"` inside the container (`.git` is
+not copied — keeps the image lean); manifests written in-container simply lack
+the SHA.
 
 ## 4. CPU inference optimisation
 - `torch.set_num_threads(k)` — cap threads (config `device.num_threads`).

@@ -37,6 +37,9 @@ model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torc
 Gives ~2–4× smaller Linear layers with <1% accuracy drift — safe for the classifier heads.
 
 ## 6. What we deliberately did NOT optimise
-- Multi-GPU/DDP (out of scope for free tiers).
+- Multi-GPU/DDP (out of scope for free tiers; Kaggle T4×2 exposes two GPUs but the training loop is single-device).
 - FP16 inference on CPU (unsupported by most CPU builds).
 - TensorRT (vendor-locked, not free-toolchain everywhere).
+- `torch.compile` / `channels_last` (evaluated and rejected: T4 is Turing/SM75 where compiled gains for 2.5–28 M-param convnets at 224 px are typically <15 %, while compile adds minutes per backbone and the variable tail batch (drop_last=False) triggers recompilation; compiled wrappers would also complicate the `best.pt` state-dict save/restore path).
+- EMA weight averaging (evaluated and rejected: on 15-epoch cosine-to-zero fine-tunes the final weights are already an implicit average, and EMA weights would have to replace `best.pt` across every consumer — evaluate, predict paths, ONNX — a behavioural change to the approved artifact chain. Future work.)
+- Gradient accumulation (evaluated and rejected: batch 64 @ 224 px with AMP fits T4 for all backbones except possibly ConvNeXt-T, which already has a per-backbone OOM fallback; accumulation would re-plumb the per-step cosine schedule).

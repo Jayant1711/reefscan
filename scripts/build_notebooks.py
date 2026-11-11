@@ -52,9 +52,13 @@ if IN_COLAB:
 
 INSTALL_COLAB = """\
 # --- (Colab only) clone the repository ---------------------------------------
-# Replace the URL with your GitHub fork, or upload the project zip instead.
-# !git clone https://github.com/<your-user>/reefscan.git /content/reefscan
-%cd {PROJECT_ROOT}
+# Clone the repo (uncomment and run ONCE if /content/reefscan does not exist):
+# !git clone https://github.com/Jayant1711/reefscan.git /content/reefscan
+import os
+if os.path.isdir("/content/reefscan"):
+    %cd /content/reefscan
+else:
+    print("NOTE: /content/reefscan missing — uncomment the git clone line above, run it, then re-run this cell.")
 !pip install -q gdown pyarrow reportlab streamlit
 """
 
@@ -78,10 +82,10 @@ ensure_output_dirs(cfg)
 import torch
 print("CUDA available:", torch.cuda.is_available())
 """),
-    ("markdown", "## 1. Datasets (~23 GB total — FishNet is the big one)"),
+    ("markdown", "## 1. Datasets (~13.6 GB total — DeepFish is the big one)"),
     ("code", """\
 # Coral (770 MB) and DeepFish (7.1 GB) are automatic.
-# FishNet (15 GB) may hit the Google Drive daily quota; if gdown fails,
+# FishNet comes from the fishnet.ai S3 mirror (resumable curl, no quota);
 # download manually (see docs/DATASETS.md) into datasets/fishnet/raw/.
 !python download_data.py --dataset all
 !python download_data.py --prepare-fishnet
@@ -148,7 +152,7 @@ for split in ("train", "validation", "test"):
 !python download_data.py --dataset deepfish
 """),
     ("code", """\
-# FishNet (~15 GB) + curated taxonomy-level subset
+# FishNet (~5.7 GB + 2.1 MB labels) + curated taxonomy-level subset
 !python download_data.py --dataset fishnet
 """),
     ("code", """\

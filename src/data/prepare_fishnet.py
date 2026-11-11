@@ -9,7 +9,9 @@ taxonomy CSVs — verified schema of ``foid_labels_bbox_v012.csv``:
 * ``label_l1`` = 28 fine-grained classes (incl. `Human`, `Unknown`, `No fish`)
 * ``label_l2`` = 13 coarse codes (ALB, YFT, BET, LAG, DOL, OIL, SKJ, BILL, …)
 * no split column → we derive a seeded, **image-level** train/val/test split
-  (every crop of one image lands in the same split — no leakage)
+  (every crop of one image lands in the same split — no *crop-level* leakage;
+   near-duplicate video frames may still straddle splits — no sequence metadata
+   in the release; see RESEARCH_METHODOLOGY.md §7)
 
 Preparation = *crop every fish bbox out of its frame* → classification crops:
 

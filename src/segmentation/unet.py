@@ -5,7 +5,10 @@ Design notes
 - Encoder channels 16/32/64/128, bottleneck 256 — small enough to train on a
   laptop CPU and fast enough for near-real-time video inference.
 - BatchNorm + ReLU double-conv blocks, transposed-conv upsampling with skip
-  concatenation (Ronneberger et al., 2015).
+  concatenation (Ronneberger et al., 2015). Small-batch BN is safe here: BN
+  statistics pool over space as well as samples (batch 8 × 256² ≈ 524 k
+  activations per channel), the standard operating regime for U-Nets — a
+  GroupNorm swap was evaluated and rejected (see docs/OPTIMIZATION.md).
 - Single-logit output; apply sigmoid externally (keeps BCEWithLogits fusion).
 """
 

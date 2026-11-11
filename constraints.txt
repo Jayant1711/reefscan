@@ -1,0 +1,36 @@
+# ============================================================================
+# ReefScan AI — pip constraints (upper bounds only; floors live in requirements.txt)
+#
+# Why this file exists: requirements.txt has open-ended >= floors. pip always
+# resolves to the newest release of everything, so the only realistic breakage
+# is a NEW major of a fast-moving library landing mid-semester. We cap exactly
+# the majors with a known history of breaking their users, and let everything
+# else float freely. Apply with:  pip install -r requirements.txt -c constraints.txt
+# ============================================================================
+
+# torch 3.0 will bump default behaviors (weights_only loading, dispatcher changes);
+# the whole suite is validated on 2.x. Also guards the CUDA-vs-CPU wheel surprise.
+torch<3
+
+# torchvision releases pin an EXACT torch version in their wheel metadata
+# (Requires-Dist: torch==2.x.y), so this cap is belt-and-braces — but it makes
+# the lockstep rule visible. Bump both lines together.
+torchvision<0.25
+
+# numpy 2.0 already broke the ABI once (torch<=2.3 and opencv<=4.9 wheels were
+# compiled against numpy 1.x and abort on import). Guard against the next major.
+numpy<3
+
+# HF datasets 4.0 removed script-based dataset loading and several load_dataset
+# kwargs; src/data/downloaders is written against the 2.x/3.x surface.
+datasets<4
+
+# Streamlit majors historically rewrite the widget/cache API. app.py uses
+# st.cache_resource / st.radio / st.set_page_config — validated on 1.x.
+streamlit<2
+
+# Deliberately NOT capped (floors in requirements.txt are sufficient):
+#   pandas, scikit-learn, scipy, matplotlib, Pillow, PyYAML, tqdm, reportlab,
+#   huggingface_hub, pyarrow, tabulate, pytest, onnx, onnxscript, onnxruntime.
+# Rationale: none of these has a pending major that changes the API subset the
+# repo uses, and over-capping is how constraint files rot.

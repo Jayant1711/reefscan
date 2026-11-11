@@ -77,6 +77,9 @@ class EpochLog:
     val_macro_f1: float = float("nan")
     val_weighted_f1: float = float("nan")
     lr: float = 0.0
+    lr_backbone: float = 0.0
+    lr_head: float = 0.0
+    grad_norm: float = float("nan")
     seconds: float = 0.0
 
 
@@ -177,6 +180,13 @@ class Trainer:
     def _lr_now(self) -> float:
         return float(self.optimizer.param_groups[-1]["lr"])
 
+    def _lr_by_group(self) -> tuple[float, float]:
+        """(backbone, head) LR — identical when the optimizer has one group."""
+        groups = self.optimizer.param_groups
+        if len(groups) == 1:
+            return float(groups[0]["lr"]), float(groups[0]["lr"])
+        return float(groups[0]["lr"]), float(groups[-1]["lr"])
+
     def _maybe_unfreeze(self, epoch: int) -> None:
         """Partial fine-tuning: unfreeze the last stage after freeze_epochs."""
         if self._unfreeze_pending and epoch > self.cfg.freeze_epochs:
@@ -191,9 +201,11 @@ class Trainer:
         for epoch in range(1, self.cfg.epochs + 1):
             t0 = time.time()
             self._maybe_unfreeze(epoch)
-            train_loss, train_acc = self._train_epoch()
+            train_loss, train_acc, grad_norm = self._train_epoch()
+            lr_backbone, lr_head = self._lr_by_group()
             log = EpochLog(epoch=epoch, train_loss=train_loss, train_acc=train_acc,
-                           lr=self._lr_now(), seconds=time.time() - t0)
+                           lr=self._lr_now(), lr_backbone=lr_backbone, lr_head=lr_head,
+                           grad_norm=grad_norm, seconds=time.time() - t0)
 
             if self.val_loader is not None:
                 val_metrics = self.validate()
@@ -222,9 +234,10 @@ class Trainer:
             logger.info("Restored best weights from epoch %d.", ckpt.get("epoch", -1))
         return self.history
 
-    def _train_epoch(self) -> tuple[float, float]:
+    def _train_epoch(self) -> tuple[float, float, float]:
         self.model.train()
         total_loss, correct, seen, loss_seen = 0.0, 0, 0, 0
+        grad_norms: list[float] = []
         pbar = tqdm(self.train_loader, desc=f"train {self.model_name}", leave=False)
         for inputs, targets in pbar:
             inputs = inputs.to(self.device, non_blocking=True)
@@ -245,9 +258,12 @@ class Trainer:
                     mixed_batch = False
 
             self.scaler.scale(loss).backward()
+            batch_grad_norm = float("nan")
             if self.cfg.grad_clip:
                 self.scaler.unscale_(self.optimizer)
-                nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.grad_clip)
+                batch_grad_norm = float(
+                    nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.grad_clip)
+                )
             self.scaler.step(self.optimizer)
             self.scaler.update()
             self.scheduler.step()
@@ -257,9 +273,13 @@ class Trainer:
             if not mixed_batch:
                 correct += (outputs.argmax(1) == targets).sum().item()
                 seen += inputs.size(0)
+            grad_norms.append(batch_grad_norm)
             pbar.set_postfix(loss=f"{total_loss / max(1, loss_seen):.3f}",
                              acc=f"{correct / max(1, seen):.3f}")
-        return total_loss / max(1, loss_seen), (correct / max(1, seen) if seen else 0.0)
+        grad_norm = [g for g in grad_norms if g == g]  # finite only
+        return (total_loss / max(1, loss_seen),
+                correct / max(1, seen) if seen else 0.0,
+                float(np.mean(grad_norm)) if grad_norm else float("nan"))
 
     @torch.no_grad()
     def validate(self) -> dict[str, float]:

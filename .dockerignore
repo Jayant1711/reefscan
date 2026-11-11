@@ -1,0 +1,26 @@
+.git
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.zcode/
+.playwright-mcp/
+# data + generated artifacts come from volumes, not the build context
+datasets/
+models/**/*.pt
+models/**/*.pth
+models/**/*.onnx
+results/
+reports/
+runs/
+# not needed at runtime
+tests/
+docs/
+notebooks/
+research_paper/
+scripts/
+*.zip
+*.md

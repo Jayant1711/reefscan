@@ -104,8 +104,7 @@ def build_dataloaders(
         sampler = (make_weighted_sampler(ds.targets, count_class_images(split_dir),
                                          class_names=class_names)
                    if (train and balance_train) else None)
-        return DataLoader(
-            ds,
+        loader_kwargs = dict(
             batch_size=batch_size,
             shuffle=(train and sampler is None),
             sampler=sampler,
@@ -113,6 +112,10 @@ def build_dataloaders(
             pin_memory=torch.cuda.is_available(),
             drop_last=False,
         )
+        if num_workers > 0:
+            # Persistent workers + prefetch: no per-epoch teardown respawn.
+            loader_kwargs.update(persistent_workers=True, prefetch_factor=2)
+        return DataLoader(ds, **loader_kwargs)
 
     logger.info("Dataset: %d classes from %s", len(class_names), data_dir)
     return LoaderBundle(

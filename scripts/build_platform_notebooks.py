@@ -105,7 +105,9 @@ def kaggle_cells() -> list[dict]:
 !python download_data.py --dataset deepfish --platform kaggle"""),
         code("""# --- 3. Data cleaning (report + quarantine flagged files) -------------------
 !python clean_data.py --dataset coral --apply --platform kaggle
-!python clean_data.py --dataset seg --apply --platform kaggle"""),
+!python clean_data.py --dataset seg --apply --platform kaggle
+# --- 3b. Pre-flight validation: FAIL stops training, WARN just flags --------
+!python scripts/preflight.py --platform kaggle --task coral"""),
         code("""# --- 4. E1 — coral feature-extraction screen (all 4 backbones, ~35 min) ----
 !python train.py --task coral --model all --strategy feature_extraction --platform kaggle
 import pandas as pd
@@ -170,7 +172,9 @@ print("fish crops materialized:", n_crops)
 assert n_crops > 1000, "too few crops - re-check the download and prepare cells above"
 """),
         code("""# --- 3. Data cleaning (corrupt/dup/leakage scan + quarantine) --------------
-!python clean_data.py --dataset fishnet --apply --platform colab"""),
+!python clean_data.py --dataset fishnet --apply --platform colab
+# --- 3b. Pre-flight validation: FAIL stops training, WARN just flags --------
+!python scripts/preflight.py --platform colab --task fish"""),
         code("""# --- 4. E4 — fish feature-extraction screen (all 4 backbones, ~1.5 h) ------
 !python train.py --task fish --model all --strategy feature_extraction --platform colab
 import pandas as pd

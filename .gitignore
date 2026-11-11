@@ -26,6 +26,8 @@ models/**/*.onnx
 # --- Generated artifacts ---
 results/*
 !results/.gitkeep
+!results/comparison/
+!results/cleaning/
 reports/*
 !reports/.gitkeep
 reports/assets/*

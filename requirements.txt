@@ -33,7 +33,7 @@ reportlab>=4.0
 huggingface_hub>=0.20
 pyarrow>=14.0          # parquet reader for NOAA coral dataset fallback
 datasets>=2.16         # optional but recommended on Colab
-tabulate>=0.9  # pandas.to_markdown in scripts/compare_runs.py             # FishNet Google Drive download
+tabulate>=0.9  # pandas.to_markdown in scripts/compare_runs.py
 
 # --- Dev / tests ---
 pytest>=7.4

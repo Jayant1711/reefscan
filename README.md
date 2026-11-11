@@ -2,10 +2,12 @@
 
 **Underwater Marine Species & Coral Reef Health Visual Assessment System**
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c)](https://pytorch.org/)
+[![CI](https://github.com/Jayant1711/reefscan/actions/workflows/ci.yml/badge.svg)](https://github.com/Jayant1711/reefscan/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x%20CPU-ee4c2c)](https://pytorch.org/)
+[![Tests](https://img.shields.io/badge/tests-80%20passing-brightgreen)](https://github.com/Jayant1711/reefscan/actions/workflows/ci.yml)
+[![Smoke](https://img.shields.io/badge/smoke-e2e%20pipeline%20on%20CI-informational)](https://github.com/Jayant1711/reefscan/actions/workflows/ci.yml)
 [![CPU friendly](https://img.shields.io/badge/runs%20on-CPU%20%7C%20Colab%20%7C%20Kaggle-success)](#-quick-start)
-[![Tests](https://img.shields.io/badge/tests-pytest%20%2B%20smoke-informational)](tests/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ReefScan AI is an end-to-end, research-grade computer-vision pipeline that turns ordinary

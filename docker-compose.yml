@@ -1,0 +1,15 @@
+services:
+  reefscan:
+    build: .
+    image: reefscan:latest
+    container_name: reefscan-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./models:/app/models        # checkpoints: models/<task>/<model>/best.pt + models/demo/
+      - ./results:/app/results      # metrics, leaderboards, reefscan.log
+      - ./reports:/app/reports      # generated PDF reports
+      # - ./datasets:/app/datasets  # only needed for dataset-browsing pages
+    environment:
+      TORCH_HOME: /app/.torch
+    restart: unless-stopped
