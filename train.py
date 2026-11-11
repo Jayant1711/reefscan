@@ -106,7 +106,7 @@ def _write_manifest(cfg, task: str, model_name: str, strategy: str, train_second
 
 
 def train_classifier(task: str, model_name: str, cfg, device: torch.device,
-                     strategy_override: str | None = None) -> None:
+                     strategy_override: str | None = None, balance_train: bool = True) -> None:
     section = cfg[task]
     data_dir = Path(section.data_dir)
     if not data_dir.exists():
@@ -123,7 +123,7 @@ def train_classifier(task: str, model_name: str, cfg, device: torch.device,
         image_size=section.image_size,
         batch_size=section.batch_size,
         num_workers=cfg.device.num_workers,
-        balance_train=True,
+        balance_train=balance_train,
         train_cfg=section.get("augmentation", {}),
     )
     logger.info("Classes (%d): %s", bundle.num_classes, bundle.class_names[:12])
@@ -135,13 +135,17 @@ def train_classifier(task: str, model_name: str, cfg, device: torch.device,
     # tilts gradients toward rare classes while weighted-F1 selection is
     # majority-biased) — config-gated so the ablation is a --set flag, not a
     # code edit. See docs/TRAINING.md.
+    # --set coerces "none"/"false"/"off" to Python None — normalise back to a
+    # string so the ablation flag actually disables the loss weights.
     loss_weight_mode = section.get("loss_class_weight_mode", "inverse_sqrt")
+    if loss_weight_mode in (None, "", "none", "false", "off"):
+        loss_weight_mode = "none"
     weights = (
         torch.tensor(class_weights(bundle.class_counts, mode=loss_weight_mode), dtype=torch.float32).to(device)
         if loss_weight_mode != "none" else None
     )
     logger.info("Class balancing: sampler=%s, loss weights=%s",
-                "on" if section.get("augmentation") is not None or True else "off", loss_weight_mode)
+                "on" if balance_train else "off", loss_weight_mode)
 
     train_cfg = TrainConfig.from_cfg(section)
     if task == "coral" and getattr(section, "ordinal_loss", False):

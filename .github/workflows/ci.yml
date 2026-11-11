@@ -43,7 +43,8 @@ jobs:
       - name: Install CPU-only torch
         run: |
           python -m pip install --upgrade pip
-          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          # -c binds the constraint caps (torch<3, torchvision<0.25) on the CPU index too
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu -c constraints.txt
 
       - name: Install project dependencies
         run: pip install -r requirements.txt -c constraints.txt
@@ -61,7 +62,7 @@ jobs:
 
       # Unit tests FIRST: test_onnx_export_parity then deterministically skips
       # (no checkpoints on a fresh checkout). See tests/test_pinning_and_export.py.
-      - name: Unit tests (80)
+      - name: Unit tests (91)
         run: python -m pytest tests/ -q --durations=10
 
       # Full pipeline on synthetic data. Worth it: the only automated exercise

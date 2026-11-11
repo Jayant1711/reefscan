@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt constraints.txt ./
 # CPU wheel index FIRST (PyPI linux default pulls ~2.5 GB of CUDA deps),
 # then the project — torch is already satisfied and is not re-resolved.
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu -c constraints.txt \
  && pip install -r requirements.txt -c constraints.txt
 
 # ---- Layer 2: application code (no tests/docs/notebooks/data in the image) ----

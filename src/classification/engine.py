@@ -276,7 +276,7 @@ class Trainer:
             grad_norms.append(batch_grad_norm)
             pbar.set_postfix(loss=f"{total_loss / max(1, loss_seen):.3f}",
                              acc=f"{correct / max(1, seen):.3f}")
-        grad_norm = [g for g in grad_norms if g == g]  # finite only
+        grad_norm = [g for g in grad_norms if g == g and abs(g) != float("inf")]  # finite only
         return (total_loss / max(1, loss_seen),
                 correct / max(1, seen) if seen else 0.0,
                 float(np.mean(grad_norm)) if grad_norm else float("nan"))

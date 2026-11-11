@@ -10,5 +10,10 @@
     "Pomacanthus_imperator",
     "Sphyraena_barracuda",
     "Zebrasoma_flavescens"
-  ]
+  ],
+  "strategy": "finetune",
+  "params": {
+    "params_total": 21287750,
+    "params_trainable": 21287750
+  }
 }

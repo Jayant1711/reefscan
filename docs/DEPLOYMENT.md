@@ -27,7 +27,9 @@ docker run -p 8501:8501 -v $(pwd)/models:/app/models -v $(pwd)/results:/app/resu
 
 Note: `provenance.git_sha()` reports `"unknown"` inside the container (`.git` is
 not copied — keeps the image lean); manifests written in-container simply lack
-the SHA.
+the SHA. On Linux hosts whose uid ≠ 1000, chown the bind-mounted dirs once
+(`sudo chown -R 1000:1000 models results reports`) so the non-root app user can
+write manifests and logs.
 
 ## 4. CPU inference optimisation
 - `torch.set_num_threads(k)` — cap threads (config `device.num_threads`).

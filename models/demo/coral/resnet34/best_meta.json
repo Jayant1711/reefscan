@@ -6,5 +6,10 @@
   "class_names": [
     "CORAL",
     "CORAL_BL"
-  ]
+  ],
+  "strategy": "finetune",
+  "params": {
+    "params_total": 21285698,
+    "params_trainable": 21285698
+  }
 }

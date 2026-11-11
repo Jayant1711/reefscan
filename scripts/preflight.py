@@ -60,6 +60,8 @@ def _disk(checks: list[Check], cid: str, path: Path, warn_gb: float, fail_gb: fl
 
 def _class_counts(image_dir: Path) -> dict[str, int]:
     counts: dict[str, int] = {}
+    if not image_dir.is_dir():
+        return counts  # a stray file named train/ — treated as an empty split
     for class_dir in sorted(p for p in image_dir.iterdir() if p.is_dir()):
         n = sum(1 for f in class_dir.rglob("*") if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"})
         if n:
@@ -115,7 +117,7 @@ def run_preflight(platform: str | None, task: str, with_pytest: bool, config_pat
     import sys
 
     v = sys.version_info
-    checks.append(Check("PY", "PASS" if v >= (3, 10) else "FAIL",
+    checks.append(Check("PY", "PASS" if v >= (3, 11) else "FAIL",
                         f"python {sys.version.split()[0]}"))
 
     # IMPORTS
@@ -143,12 +145,17 @@ def run_preflight(platform: str | None, task: str, with_pytest: bool, config_pat
     except Exception as exc:
         checks.append(Check("GPU", "FAIL", f"torch probe failed: {exc}"))
 
-    # Config + platform merge (same order as train.py)
+    # Config + platform + --set merge (same order as train.py: load → platform → --set)
+    from src.config import override_from_args
+
     cfg = load_config(config_path)
     if platform:
         overlay = ROOT / "configs" / "platform" / f"{platform}.yaml"
         if overlay.exists():
             merge_config_file(cfg, overlay)
+    if extra_sets:
+        args_like = argparse.Namespace(set=extra_sets)
+        override_from_args(cfg, args_like)
 
     # DISK
     _disk(checks, "DISK_REPO", ROOT, MIN_DISK_REPO_WARN_GB, MIN_DISK_REPO_GB)
@@ -168,8 +175,8 @@ def run_preflight(platform: str | None, task: str, with_pytest: bool, config_pat
     checks.append(Check("WRITABLE", "FAIL" if unwritable else "PASS",
                         "results/reports/models dirs writable" if not unwritable else str(unwritable)))
 
-    # DATASETS (respect --task)
-    tasks = ["fish", "coral", "seg"] if task == "all" else [task]
+    # DATASETS (respect --task; comma lists allowed, e.g. coral,seg)
+    tasks = ["fish", "coral", "seg"] if task == "all" else [t.strip() for t in task.split(",") if t.strip()]
     if "coral" in tasks:
         _dataset_check(checks, "DS_CORAL", Path(cfg.coral.data_dir), min_per_class=50)
     if "fish" in tasks:
@@ -254,10 +261,12 @@ def run_preflight(platform: str | None, task: str, with_pytest: bool, config_pat
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--platform", default=None, choices=["kaggle", "colab", "lightning", "local"])
-    parser.add_argument("--task", default="all", choices=["all", "fish", "coral", "seg"])
+    parser.add_argument("--task", default="all",
+                        help="Which dataset checks to run: all | fish | coral | seg | comma list (e.g. coral,seg)")
     parser.add_argument("--with-pytest", action="store_true")
     parser.add_argument("--config", default=None)
-    parser.add_argument("--set", nargs="*", default=[])
+    parser.add_argument("--set", nargs="*", default=[],
+                        help="Config overrides (same as train.py) so preflight mirrors the real run")
     parser.add_argument("--json", action="store_true", help="Print the JSON report too")
     args = parser.parse_args()
 
@@ -290,4 +299,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception as exc:  # crash = exit 2, distinct from FAIL (1)
+        print(f"PREFLIGHT CRASHED: {type(exc).__name__}: {exc}")
+        raise SystemExit(2)
