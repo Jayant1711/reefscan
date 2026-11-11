@@ -38,5 +38,4 @@ def run_cli(main_fn) -> int:
                 "--set <task>.batch_size=16 (see docs/TRAINING.md)."
             )
             return 1
-        logger.error("%s", exc)
-        return 1
+        raise  # a non-OOM RuntimeError is a real bug — let it traceback

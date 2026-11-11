@@ -15,7 +15,7 @@
 %cd reefscan
 !pip install -q -r requirements.txt
 import torch; print("GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU ONLY — STOP")
-!python -m pytest tests/ -q    # verify the full suite (80 tests) on the platform
+!python -m pytest tests/ -q    # verify the full suite (91 tests) on the platform
 ```
 
 GPU runtimes (enable BEFORE running any cell):
