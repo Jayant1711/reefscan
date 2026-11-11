@@ -133,27 +133,6 @@ def unfreeze_stage(model: nn.Module, name: str) -> None:
     logger.info("Unfroze last stage '%s' of %s (%.2fM params now trainable).", prefix, name, unfrozen / 1e6)
 
 
-def strategy_param_groups(model: nn.Module, name: str, lr: float,
-                          head_lr_multiplier: float = 10.0,
-                          stage_lr_multiplier: float = 0.1) -> list[dict]:
-    """LR groups for partial fine-tuning: head fast, last stage slow, rest frozen."""
-    head_params, stage_params = [], []
-    prefix = _LAST_STAGE.get(name, "")
-    for param_name, param in model.named_parameters():
-        if not param.requires_grad:
-            continue
-        if "fc" in param_name or "classifier" in param_name:
-            head_params.append(param)
-        elif prefix and param_name.startswith(prefix):
-            stage_params.append(param)
-    groups = []
-    if stage_params:
-        groups.append({"params": stage_params, "lr": lr * stage_lr_multiplier})
-    if head_params:
-        groups.append({"params": head_params, "lr": lr * head_lr_multiplier})
-    return groups
-
-
 def partial_finetune_groups(model: nn.Module, name: str, lr: float,
                             head_lr_multiplier: float = 10.0,
                             stage_lr_multiplier: float = 0.1) -> list[dict]:

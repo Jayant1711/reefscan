@@ -118,7 +118,7 @@ class SurveyAnalyzer:
         bleached_frames = [a for a in analyses if a.coral is not None and a.coral.assessment.index >= mild_cut]
         bleached_frac = len(bleached_frames) / max(1, len(bsi_values))
         trend = severity_trend_summary(analyses, getattr(self.cfg.analytics, "trend_ewma_alpha", 0.3) if self.cfg else 0.3)
-        self.condition_distribution = self._condition_distribution(trend.history)
+        condition_distribution = self._condition_distribution(trend.history)
 
         # ---- environment
         images = list(source_images) if source_images is not None else []
@@ -146,5 +146,5 @@ class SurveyAnalyzer:
             coral_risk_score=coral_risk.score,
             coral_risk_category=coral_risk.category,
             bleached_frame_fraction=bleached_frac,
-            condition_distribution=self._condition_distribution(trend.history),
+            condition_distribution=condition_distribution,
         )

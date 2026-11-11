@@ -58,6 +58,7 @@ def run_task_evaluation(cfg, task: str, model: str | None, device) -> None:
             image_size=cfg.seg.image_size,
             batch_size=cfg.seg.batch_size,
             min_box_area=cfg.seg.min_box_area,
+            threshold=cfg.seg.threshold,
         )
         logger.info("Seg metrics -> %s", Path(cfg.paths.results_dir) / "seg" / "metrics.json")
         return metrics

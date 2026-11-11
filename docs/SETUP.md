@@ -52,7 +52,7 @@ python train.py --task fish --model resnet34 --set fish.epochs=5 fish.batch_size
 | `reports/` | generated PDF reports |
 
 ## 6. Troubleshooting
-- **`torch.load` fails with weights_only** — always keep `weights_only=False` (our checkpoints contain class-name lists).
+- **`torch.load` fails with weights_only** — our checkpoints are plain payload types and load with `weights_only=True` (the safe default since torch 2.4); if you load a foreign checkpoint and hit a weights_only error, do NOT flip it off blindly - only load checkpoints you trust.
 - **Windows DataLoader hang** — keep `device.num_workers: 0` (default).
 - **gdown quota error for FishNet** — download manually per `docs/DATASETS.md`.
 - **OpenCV 5 + old numpy** — `pip install "numpy>=1.26"` resolves most ABI issues.

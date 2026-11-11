@@ -34,6 +34,7 @@ def evaluate_segmentation(
     batch_size: int = 8,
     min_box_area: int = 150,
     iou_threshold: float = 0.5,
+    threshold: float = 0.5,
 ) -> dict:
     """Evaluate the trained U-Net on the validation split and persist metrics."""
     from sklearn.metrics import average_precision_score
@@ -67,7 +68,7 @@ def evaluate_segmentation(
         logits = model(imgs)
         probs = torch.sigmoid(logits)
 
-        d, i = dice_iou_scores(logits, masks_dev)
+        d, i = dice_iou_scores(logits, masks_dev, threshold=threshold)
         dices.append(d)
         ious.append(i)
 
@@ -82,7 +83,7 @@ def evaluate_segmentation(
             prob_mask = probs[b, 0].cpu().numpy()
             gt_mask = masks[b, 0].numpy()
             gt_boxes = masks_to_boxes(gt_mask, threshold=0.5, min_area=1)
-            pred_boxes = masks_to_boxes(prob_mask, threshold=0.5, min_area=min_box_area)
+            pred_boxes = masks_to_boxes(prob_mask, threshold=threshold, min_area=min_box_area)
             n_gt_total += len(gt_boxes)
             n_pred_total += len(pred_boxes)
 
@@ -119,6 +120,7 @@ def evaluate_segmentation(
         "n_pred_boxes": int(n_pred_total),
         "iou_threshold": iou_threshold,
         "min_box_area": min_box_area,
+        "threshold": threshold,
     }
     save_json(metrics, out_dir / "metrics.json")
     logger.info("Seg eval: IoU=%.4f Dice=%.4f pixelAP=%.4f boxAP@0.5=%.4f",

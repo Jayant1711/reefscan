@@ -62,7 +62,7 @@ Companion to `VIVA_QUESTIONS.md`. Answers are deliberately concise — expand li
 
 **F30. Frame-skip safety.** The tracker interpolates identity across skipped frames (a track survives `max_disappeared` frames), so unique counts are stable; we measured count drift <5% at skip=2 on survey-style footage (and skip is user-adjustable).
 
-**G31. Diversity indices.** Shannon $H'=-\sum p\ln p$ — uncertainty/evenness; Gini-Simpson $1-\sum p^2$ — probability two random individuals differ (dominance-resistant); Margalef $(S-1)/\ln N$ — richness per个体-normalised. They respond to different data pathologies, so a weighted mean is more robust than any single index; all three are classic ecology, giving the score scientific legitimacy.
+**G31. Diversity indices.** Shannon $H'=-\sum p\ln p$ — uncertainty/evenness; Gini-Simpson $1-\sum p^2$ — probability two random individuals differ (dominance-resistant); Margalef $(S-1)/\ln N$ — richness per-individual-normalised. They respond to different data pathologies, so a weighted mean is more robust than any single index; all three are classic ecology, giving the score scientific legitimacy.
 
 **G32. RHS weights.** Severity dominates (0.60) because it is the direct health signal; coverage (0.25) captures spatial extent; environment (0.15) is a modifier, not the pathology itself. Rationale documented; weights config-exposed for ablation.
 

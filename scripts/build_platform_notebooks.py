@@ -179,6 +179,9 @@ pd.read_csv("results/fish/model_leaderboard.csv")"""),
 import pandas as pd, subprocess, sys
 lb = pd.read_csv("results/fish/model_leaderboard.csv")
 fe = lb[lb["strategy"] == "feature_extraction"]
+assert len(fe) >= 1, f"FE screen has no rows - E4 did not complete (only {len(lb)} rows total)"
+if len(fe) < 4:
+    print(f"WARNING: FE screen incomplete ({len(fe)}/4) - proceeding with available backbones")
 winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
 print("Fine-tuning FE-screen winner:", winner)
 r = subprocess.run([sys.executable, "train.py", "--task", "fish", "--model", winner,

@@ -44,10 +44,10 @@ streamlit run app.py
 Then, for real research results:
 
 ```bash
-# datasets (~23 GB total; each can run independently — see docs/DATASETS.md)
+# datasets (~13.6 GB total; each can run independently — see docs/DATASETS.md)
 python download_data.py --dataset coral      # NOAA coral, ~770 MB (easiest)
 python download_data.py --dataset deepfish   # DeepFish, ~7.1 GB
-python download_data.py --dataset fishnet    # FishNet, ~15 GB (gdown / manual fallback)
+python download_data.py --dataset fishnet    # fishnet.ai v0.1.2, ~5.7 GB S3 (resumable curl)
 
 # training
 python train.py --task fish --model all      # 4-backbone species benchmark
@@ -66,8 +66,9 @@ python inference.py --mode video --input survey.mp4
 python inference.py --mode webcam
 ```
 
-Google Colab users: open `notebooks/00_ReefScan_Colab_AllInOne.ipynb` (T4 GPU) — it runs
-everything above in one session and prints the dashboard URL.
+Cloud training: open the ready-to-run platform notebooks — `notebooks/platform/KAGGLE_training.ipynb`,
+`COLAB_training.ipynb`, `LIGHTNING_backup.ipynb` — they auto-clone, gate on the test suite,
+train the E-matrix, and zip artifacts for download. See `PLATFORMS.md` + `STEPS_TO_DO.md`.
 
 ---
 
@@ -150,7 +151,7 @@ python -m pytest tests/ -q   # 80 unit tests: metric identities, WGBS math, CAMs
 
 ## 🙏 Datasets & citations
 
-- **FishNet** (ICCV 2023) — Khan et al. — https://fishnet-2023.github.io/
+- **fishnet.ai v0.1.2** (The Nature Conservancy) — https://www.fishnet.ai/download (arXiv:2106.09178)
 - **DeepFish** (Scientific Reports 2020) — Saleh et al. — https://alzayats.github.io/DeepFish/
 - **NOAA PIFSC ESD Coral Bleaching** — https://huggingface.co/datasets/NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Dataset
 

@@ -249,7 +249,7 @@ from src.segmentation.unet import SmallUNet
 from src.segmentation.postprocess import masks_to_boxes
 import torch
 
-ckpt = torch.load("models/seg/best.pt", map_location="cpu", weights_only=False)
+ckpt = torch.load("models/seg/best.pt", map_location="cpu", weights_only=True)
 model = SmallUNet(); model.load_state_dict(ckpt["model"]); model.eval()
 
 img_path = sorted(glob.glob("datasets/deepfish/DeepFish/Segmentation/**/*.jpg", recursive=True))[0]

@@ -95,9 +95,11 @@ Duration: only the missing experiments. Free monthly credits (~15 T4 hours).
    ```
 4. **Commit the ledger + results** (models stay git-ignored):
    ```bat
-   git add my_requested_thing.md results runs
+   git add my_requested_thing.md results/comparison
    git commit -m "results: platform training complete + final model selection"
    git push
+   # (models/, most of results/, runs/ are git-ignored by design - the zips in
+   #  C:\reefscan_runs\artifacts\ are your permanent training record)
    ```
 5. **Keep as your permanent model library** (recommended): copy
    `models\fish\<winner>\best.pt`, `models\coral\<winner>\best.pt`,

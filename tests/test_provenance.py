@@ -46,7 +46,7 @@ def test_build_manifest_fields():
         epochs_ran=3,
         final_metrics={"accuracy": 0.91234, "macro_ap": 0.85, "weird": [1, 2]},
     )
-    assert manifest["schema"] == "reefscan-run-manifest-v1"
+    assert manifest["schema"] == "reefscan-run-manifest-v2"
     assert manifest["task"] == "coral" and manifest["strategy"] == "feature_extraction"
     assert manifest["train_seconds"] == 61.4 and manifest["epochs_ran"] == 3
     assert manifest["final_metrics"]["accuracy"] == 0.91234

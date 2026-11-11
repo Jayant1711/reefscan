@@ -53,7 +53,6 @@ from src.dashboard.pages import (  # noqa: E402  (after set_page_config)
 
 PAGES = {
     "🏠 Home": page_home,
-    "🖼️ Upload Image": page_species,
     "🎬 Upload Video": page_realtime,
     "✨ Enhancement Comparison": page_enhance,
     "🐟 Species Classification": page_species,

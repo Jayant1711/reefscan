@@ -112,7 +112,7 @@ class SeverityAssessment:
 class BleachingAssessor:
     """Fuses a trained coral CNN's bleached-probability with patch whiteness."""
 
-    def __init__(self, fusion_lambda: float = 0.60, thresholds: tuple[float, ...] = (15, 35, 60, 85),
+    def __init__(self, fusion_lambda: float = 0.60, thresholds: tuple[float, ...] = DEFAULT_THRESHOLDS,
                  s_max: int = 70, v_min: int = 140) -> None:
         self.fusion_lambda = fusion_lambda
         self.thresholds = thresholds
