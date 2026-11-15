@@ -115,7 +115,7 @@ Every learned component stays under honest binary supervision — the graded out
 │   ├── explainability/  realtime/  analytics/  reporting/  dashboard/
 │   ├── data/               # downloaders + prepare_fishnet
 │   └── utils/  config/
-├── notebooks/              # 7 Colab-ready notebooks (incl. all-in-one GPU run)
+├── notebooks/platform/     # 3 ready-to-run training notebooks (Kaggle/Colab/Lightning)
 ├── tests/                  # pytest: hand-computed metrics, contracts, CAMs, trackers
 ├── docs/                   # SETUP · DATASETS · TRAINING · DEPLOYMENT · API ·
 │                           # USER_MANUAL · METHODOLOGY · VIVA Q&A · INTERVIEW · …

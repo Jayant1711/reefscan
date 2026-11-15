@@ -22,6 +22,9 @@ models/**/*.pt
 models/**/*.pth
 models/**/*.onnx
 !models/.gitkeep
+models/demo/best_model.json
+models/demo/**/best_meta.json
+models/demo/**/history.csv
 
 # --- Generated artifacts ---
 results/*

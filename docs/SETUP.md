@@ -24,7 +24,7 @@ pip install -r requirements.txt
 ### Option B — Google Colab (free GPU)
 1. Open [colab.research.google.com](https://colab.research.google.com) → New notebook.
 2. Runtime → Change runtime type → **T4 GPU**.
-3. Follow `notebooks/00_ReefScan_Colab_AllInOne.ipynb`.
+3. Follow the ready-to-run notebook for your platform: `notebooks/platform/KAGGLE_training.ipynb`, `COLAB_training.ipynb` or `LIGHTNING_backup.ipynb` (see `PLATFORMS.md`).
 
 ### Option C — Kaggle
 Same as Colab; datasets can be attached as Kaggle Datasets to skip download time.
