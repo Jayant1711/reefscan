@@ -175,31 +175,74 @@ platform in `my_requested_thing.md` §6 — E1–E3 coral/seg, E4–E5 fish).
 
 ---
 
-## The first prompt to give Antigravity (copy-paste)
+## The first prompt to give Antigravity (copy-paste this entire block)
 
 ```text
-You are operating the ReefScan AI repository (a final-year underwater computer-vision project).
-Open and read HANDOFF.md at the repo root — it is your complete runbook. Execute its steps in
-order, on this machine:
+You are operating the ReefScan AI repository — a final-year underwater computer-vision
+system (underwater image enhancement -> fish species classification -> coral bleaching
+severity -> fish detection/tracking -> biodiversity analytics -> PDF reports + dashboard).
+Full runbook: HANDOFF.md at the repo root. Dataset→model mapping and the experiment
+matrix are in my_requested_thing.md §1 and §4/§6.
 
-1. Environment: Python 3.11+ venv, CUDA-enabled torch install (HANDOFF.md Step 2 — on Windows
-   the default pip wheel is CPU-only; use the cu1xx index with -c constraints.txt).
-2. Verify: pytest tests/ -q must pass (91 tests) before anything else.
-3. Dataset sources: run `python scripts/verify_online_data.py` FIRST. All three checks must PASS.
-   A "SCHEMA DRIFT — FAIL" means the upstream release changed: STOP and tell the user — do not
-   patch the code yourself.
-4. Download + clean + preflight: follow HANDOFF.md Steps 4-6 (datasets ~13.6 GB are resumable;
-   cleaning quarantines instead of deleting; preflight must exit 0 with --platform gpu).
-5. Train E1 -> E6 exactly as HANDOFF.md Step 7 says, with --continue on every train.py call and
-   --platform gpu. Verify each step's artefact before the next.
-6. Ledger: run scripts/log_experiment.py then scripts/compare_runs.py.
-7. Hand back: run scripts/export_artifacts.py and give me the zip path; then push the
-   results/local-gpu branch (ledger + results/comparison) as HANDOFF.md Step 9 says.
+MISSION: run the complete training matrix E1–E6 on the best GPU available to you
+(preference: a linked Colab GPU first — use notebooks/platform/COLAB_training.ipynb or
+the CLI there with --platform colab; otherwise this machine's NVIDIA GPU with
+--platform gpu; NEVER train on CPU-only machines), then produce and hand back the
+artefacts we could not produce on the owner's GPU-less laptop: trained checkpoints,
+leaderboards with average-precision metrics, segmentation IoU/Dice/box-AP50, per-run
+manifests, the filled experiment ledger, and the final model-selection comparison.
 
-Rules: never edit source/config files to fix a failure — report it to me; never skip preflight;
-never regenerate notebooks/platform/; prefer the linked Colab GPU for training if available and
-keep this PC's GPU load minimal; run scripts/verify_online_data.py again if a download fails
-mid-way (upstream may have drifted).
+Execute, in order, verifying after every step:
+
+1. Environment (HANDOFF.md Steps 0–3): Python 3.11+ venv; install CUDA torch
+   (on Windows the default pip wheel is CPU-only — use the cu1xx index) with
+   -c constraints.txt; then pip install -r requirements.txt -c constraints.txt.
+   VERIFY: python -m pytest tests/ -q must pass (91 tests) and
+   python -c "import torch; print(torch.cuda.is_available())" must be True on
+   the training machine.
+
+2. Dataset-source verification (BEFORE the multi-GB downloads):
+   python scripts/verify_online_data.py
+   All three checks (F4K, CORAL, DEEPFISH) must PASS. A "SCHEMA DRIFT — FAIL"
+   means the upstream release changed: STOP and tell the user — do not patch
+   the code yourself.
+
+3. Data (HANDOFF.md Step 4): download all three datasets with --platform matching
+   your compute (gpu on the workstation, colab on Colab), then clean each with
+   clean_data.py --apply. VERIFY: results/cleaning/*_cleaning_report.json exist
+   and per-split images appear under datasets/<name>/curated or imagefolders.
+
+4. Pre-flight gate (Step 6): python scripts/preflight.py --platform <your
+   platform> --task coral,seg,fish,fishnet... (use --task all) — must exit 0.
+   A FAIL halts the run: fix the environment, not the code.
+
+5. Training matrix (HANDOFF.md Step 7) — dataset→model mapping:
+   - E1  coral:      train.py --task coral --model all --strategy feature_extraction
+   - E2  coral:      fine-tune the top-2 by weighted_f1 among FE rows
+                     (+ optional partial_finetune on the winner, non-fatal)
+   - E3  segment:    train.py --task seg  (U-Net on DeepFish masks), then
+                     evaluate.py --task seg (IoU/Dice/pixel-AP/box-AP50)
+   - E4  fish:       train.py --task fish --model all --strategy feature_extraction
+                     (Fish4Knowledge crops; F4K = the species dataset)
+   - E5  fish:       fine-tune the E4 FE-screen winner
+   - E6  evaluate:   evaluate.py --task coral / --task fish / --enhancement / --xai
+   Use --continue on every train.py call (idempotent — completed runs are skipped)
+   and the matching --platform on every CLI call. One CUDA OOM is caught per
+   backbone automatically; retry that backbone with --set <task>.batch_size=32.
+
+6. Ledger + hand-back (HANDOFF.md Step 9):
+   python scripts/log_experiment.py     # fills my_requested_thing.md Experiment log
+   python scripts/compare_runs.py       # writes results/comparison/final_comparison.csv
+                                        # and the FINAL SELECTION into the ledger
+   python scripts/export_artifacts.py   # bundles models/results/runs/reports into one zip
+   Hand back the zip to the user AND push the results/local-gpu (or colab) branch with
+   the committable results (comparison + cleaning reports).
+
+RULES: never edit source/config files to fix a failure — report it to the user;
+never skip preflight or the pytest gate; re-run scripts/verify_online_data.py if a
+download fails mid-way (upstream may have drifted); --continue on every training call;
+prefer Colab GPU over the workstation GPU; do not run run_smoke_test.py on the
+training box mid-matrix. Report every traceback verbatim to the user.
 ```
 
 ---
