@@ -84,7 +84,7 @@ sources still match, so a silent upstream change is caught BEFORE 13.6 GB are pu
 python scripts/verify_online_data.py
 ```
 ✅ Verify: all three checks PASS —
-- `FISHNET PASS` (columns img_id/bbox_id/x_min…/label_l1/label_l2; ~159k rows; ~35k frames; classes incl. Albacore, Yellowfin tuna)
+- `F4K PASS` (columns file_name/cluster_id; 27,370 verified crops; 23 species clusters)
 - `CORAL PASS` (splits 7,292/1,562/1,565; classes CORAL, CORAL_BL)
 - `DEEPFISH PASS` (DeepFish.tar present, ~7.1 GB)
 
@@ -98,7 +98,7 @@ After the downloads, cleaning reports (Step 5) re-verify the materialised copy l
 ```bash
 python download_data.py --dataset coral --platform gpu
 python download_data.py --dataset deepfish --platform gpu
-python download_data.py --dataset fishnet --platform gpu     # 5.7 GB images + 2.1 MB labels, then auto-crops
+python download_data.py --dataset f4k --platform gpu        # Fish4Knowledge ~487 MB tar + class_id.csv (27,370 crops, 23 species)
 ```
 ✅ Verify: `python scripts/preflight.py --platform gpu --task coral` shows `DS_CORAL PASS` (fish/seg will WARN/FAIL until their downloads finish — run preflight again after each download if you want per-dataset confirmation).
 
@@ -108,7 +108,7 @@ Interrupted? Re-run the same command — archives resume (`curl -C -`), extracti
 
 ```bash
 python clean_data.py --dataset coral --apply --platform gpu
-python clean_data.py --dataset fishnet --apply --platform gpu
+python clean_data.py --dataset f4k --apply --platform gpu
 python clean_data.py --dataset seg --apply --platform gpu
 ```
 ✅ Verify: reports at `results/cleaning/<name>_cleaning_report.json`; counts printed at the end.
@@ -116,7 +116,7 @@ python clean_data.py --dataset seg --apply --platform gpu
 ## Step 6 — Pre-flight gate
 
 ```bash
-python scripts/preflight.py --platform gpu --task coral,seg,fish,fishnet --with-pytest
+python scripts/preflight.py --platform gpu --task coral,seg,fish --with-pytest
 ```
 ✅ Verify: **0 FAIL** (warnings OK). The command exits 1 on any FAIL — do not start training until it exits 0.
 
@@ -129,7 +129,7 @@ python scripts/preflight.py --platform gpu --task coral,seg,fish,fishnet --with-
 | **E3** segmentation (~30 m) | `python train.py --task seg --platform gpu --continue` then `python evaluate.py --task seg --platform gpu` | `results/seg/metrics.json` (IoU/Dice/pixel-AP/box-AP50) |
 | **E4** fish FE screen (~1.5 h) | `python train.py --task fish --model all --strategy feature_extraction --platform gpu --continue` | `results/fish/model_leaderboard.csv` has 4 FE rows |
 | **E5** fish FT winner (~1.5 h) | `python train.py --task fish --model <E4 winner> --strategy finetune --platform gpu --continue` | `runs/fish/<winner>_finetune/manifest.json` |
-| **E6** evaluation sweep (~15 m) | `python evaluate.py --task coral --platform gpu` · `--task fish --platform gpu` · `--enhancement --data datasets/fishnet/curated/train` | refreshed leaderboards + `results/enhancement/` |
+| **E6** evaluation sweep (~15 m) | `python evaluate.py --task coral --platform gpu` · `--task fish --platform gpu` · `--enhancement --data datasets/f4k/curated/train` | refreshed leaderboards + `results/enhancement/` |
 
 The E2/E5 winners are picked from the leaderboards (rank by `weighted_f1` among `strategy == feature_extraction` rows). OOM on a backbone? It is caught automatically and the sweep continues; for a manual re-run add `--set coral.batch_size=32` (or 16). `--continue` makes every re-run skip completed work.
 

@@ -159,26 +159,26 @@ def colab_cells() -> list[dict]:
     setup = SETUP_COMMON.replace("REPO_DIR", "/content/reefscan")
     return [
         md("# ReefScan AI — Colab GPU training (E4 + E5 + E6)\n\n"
-           "Runs the **fish species** experiment matrix on fishnet.ai crops "
+           "Runs the **fish species** experiment matrix on Fish4Knowledge crops "
            "(feature-extraction screen → fine-tune the winner) + XAI/enhancement benchmarks.\n\n"
            "**Before Run All:** Runtime → *Change runtime type* → **T4 GPU**. Duration ≈ 2.5–3.5 h. "
            "If *Allocating runtime* hangs, retry later — at the end the artifact zip downloads "
            "straight to your PC."),
         code(setup),
         code(GPU_CHECK),
-        code("""# --- 2. FishNet v0.1.2 from fishnet.ai S3 (5.7 GB) -> bbox crops ----------
-!python download_data.py --dataset fishnet --platform colab
-!python download_data.py --prepare-fishnet --platform colab
+        code("""# --- 2. Fish4Knowledge from the Edinburgh mirror (~487 MB) -> species crops ----
+!python download_data.py --dataset f4k --platform colab
+!python download_data.py --prepare-f4k --platform colab
 import glob
-n_crops = len(glob.glob("/content/reefscan_data/fishnet/curated/*/*/*.jpg"))
-print("fish crops materialized:", n_crops)
+n_crops = len(glob.glob("/content/reefscan_data/f4k/curated/*/*/*.png"))
+print("species crops materialized:", n_crops)
 assert n_crops > 1000, "too few crops - re-check the download and prepare cells above"
 """),
         code("""# --- 3. Data cleaning (corrupt/dup/leakage scan + quarantine) --------------
-!python clean_data.py --dataset fishnet --apply --platform colab
+!python clean_data.py --dataset f4k --apply --platform colab
 # --- 3b. Pre-flight validation: FAIL halts Run All before any GPU time ------
 import subprocess, sys
-r = subprocess.run([sys.executable, "scripts/preflight.py", "--platform", "colab", "--task", "fish,fishnet"])
+r = subprocess.run([sys.executable, "scripts/preflight.py", "--platform", "colab", "--task", "fish"])
 assert r.returncode == 0, "PREFLIGHT FAILED — fix the FAIL rows above before training. "
 """),
         code("""# --- 4. E4 — fish feature-extraction screen (all 4 backbones, ~1.5 h) ------
@@ -202,9 +202,9 @@ if r.returncode != 0:
 pd.read_csv("results/fish/model_leaderboard.csv")"""),
         code("""# --- 6. E6 — XAI grid + enhancement benchmark on real data ------------------
 import glob, shlex
-samples = (glob.glob("/content/reefscan_data/fishnet/curated/test/*/*.jpg") or
-           glob.glob("/content/reefscan_data/fishnet/curated/train/*/*.jpg"))
-!python evaluate.py --enhancement --data /content/reefscan_data/fishnet/curated/train
+samples = (glob.glob("/content/reefscan_data/f4k/curated/test/*/*.png") or
+           glob.glob("/content/reefscan_data/f4k/curated/train/*/*.png"))
+!python evaluate.py --enhancement --data /content/reefscan_data/f4k/curated/train
 if samples:
     !python evaluate.py --xai --image {shlex.quote(str(samples[0]))}
 else:
@@ -265,10 +265,10 @@ elif not done("seg", "unet_small", "from_scratch"):
     run(["evaluate.py", "--task", "seg"])
     print(">>> E3 done. Re-run this notebook to continue with fish (E4/E5).")
 elif not done("fish", "resnet34", "feature_extraction"):
-    if not Path("datasets/fishnet/curated").exists() or not list(Path("datasets/fishnet/curated").rglob("*.jpg")):
-        run(["download_data.py", "--dataset", "fishnet"])
-        run(["download_data.py", "--prepare-fishnet"])
-    run(["clean_data.py", "--dataset", "fishnet", "--apply"])
+    if not Path("datasets/f4k/curated").exists() or not list(Path("datasets/f4k/curated").rglob("*.png")):
+        run(["download_data.py", "--dataset", "f4k"])
+        run(["download_data.py", "--prepare-f4k"])
+    run(["clean_data.py", "--dataset", "f4k", "--apply"])
     run(["train.py", "--task", "fish", "--model", "all", "--strategy", "feature_extraction", "--platform", "lightning"])
     print(">>> E4 done. Re-run this notebook to continue with E5.")
 elif not any((Path("runs") / "fish" / d.name / "manifest.json").exists()

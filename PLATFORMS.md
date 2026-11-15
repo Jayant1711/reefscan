@@ -36,8 +36,8 @@ GPU runtimes (enable BEFORE running any cell):
 python scripts/verify_online_data.py   # upstream schema drift alarm (metadata-only, ~1 min)
 !python download_data.py --dataset coral --platform kaggle
 !python download_data.py --dataset deepfish --platform kaggle
-# FishNet (E4/E5 run on Colab; skip here unless re-assigned):
-# !python download_data.py --dataset fishnet
+# F4K (E4/E5 run on Colab; skip here unless re-assigned):
+# !python download_data.py --dataset f4k
 
 # 2) clean (report -> quarantine flagged files)
 !python clean_data.py --dataset coral --apply --platform kaggle
@@ -69,9 +69,9 @@ Download: Kaggle notebook **Output panel** → the `reefscan_artifacts_kaggle_*.
 ```python
 # 0) setup (common first cell above)
 # 1) dataset (FishNet v0.1.2 from the fishnet.ai S3 mirror)
-!python download_data.py --dataset fishnet --platform colab
-!python download_data.py --prepare-fishnet --platform colab
-!python clean_data.py --dataset fishnet --apply --platform colab
+!python download_data.py --dataset f4k --platform colab
+!python download_data.py --prepare-f4k --platform colab
+!python clean_data.py --dataset f4k --apply --platform colab
 
 # 2) E4 — fish FE screen (all 4 backbones, ~1.5 h on T4)
 !python train.py --task fish --model all --strategy feature_extraction --platform colab
@@ -81,7 +81,7 @@ Download: Kaggle notebook **Output panel** → the `reefscan_artifacts_kaggle_*.
 
 # 4) E6 — XAI + enhancement benchmark
 !python evaluate.py --task fish --platform colab
-!python evaluate.py --enhancement --data /content/reefscan_data/fishnet/curated/train
+!python evaluate.py --enhancement --data /content/reefscan_data/f4k/curated/train
 !python evaluate.py --xai --image <any curated train image>
 
 # 5) SAVE (before session ends!)

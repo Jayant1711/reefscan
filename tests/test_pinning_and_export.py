@@ -83,18 +83,15 @@ def test_onnx_export_parity():
     assert np.allclose(out_ort, out_pt, atol=1e-3), "ONNX/torch parity drift"
 
 
-def test_fishnet_label_columns_pinned_between_verifier_and_prepare():
+def test_f4k_schema_pinned_between_verifier_and_prepare():
     """scripts/verify_online_data.py (the online drift alarm) and
-    src/data/prepare_fishnet.py (the consumer) must agree on the fishnet.ai
-    label schema — including bbox_id, which the crop loop dereferences."""
+    src/data/prepare_f4k.py (the consumer) must agree on the F4K release layout:
+    species labels live in fish_NN directories of the extracted tar."""
     root = Path(__file__).resolve().parents[1]
     verifier = (root / "scripts" / "verify_online_data.py").read_text(encoding="utf-8")
-    prepare = (root / "src" / "data" / "prepare_fishnet.py").read_text(encoding="utf-8")
-    expected = sorted("img_id bbox_id x_min x_max y_min y_max label_l1 label_l2".split())
-    vf = sorted(re.findall(r'"([a-z_0-9]+)"',
-                           re.search(r"EXPECTED_FISHNET_COLUMNS = \(([^)]*)\)", verifier).group(1)))
-    pf = sorted(re.findall(r'"([a-z_0-9]+)"',
-                           re.search(r'required = \{([^}]*)\}', prepare).group(1)))
-    assert vf == expected, f"verifier columns drifted: {vf}"
-    assert pf == expected, f"prepare required-set drifted: {pf}"
+    prepare = (root / "src" / "data" / "prepare_f4k.py").read_text(encoding="utf-8")
+    assert 'EXPECTED_F4K_COLUMNS = ("file_name", "cluster_id")' in verifier
+    assert "EXPECTED_F4K_CLUSTERS = 23" in verifier
+    assert "fishRecognition_GT" in prepare and "fish_image" in prepare
+    assert "_video_group" in prepare  # video-group split pins the leakage defence
 

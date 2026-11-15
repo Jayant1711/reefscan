@@ -30,7 +30,7 @@ from src.classification import build_model, build_dataloaders, Trainer, TrainCon
 from src.classification.class_balancing import class_weights
 import torch
 
-bundle = build_dataloaders("datasets/fishnet/curated", image_size=224, batch_size=32)
+bundle = build_dataloaders("datasets/f4k/curated", image_size=224, batch_size=32)
 weights = torch.tensor(class_weights(bundle.class_counts), dtype=torch.float32)
 trainer = Trainer("resnet34", bundle.num_classes, bundle.train, bundle.val,
                   TrainConfig(epochs=15, lr=1e-4), bundle.class_names,

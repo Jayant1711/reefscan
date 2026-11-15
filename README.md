@@ -49,7 +49,7 @@ Then, for real research results:
 # datasets (~13.6 GB total; each can run independently — see docs/DATASETS.md)
 python download_data.py --dataset coral      # NOAA coral, ~770 MB (easiest)
 python download_data.py --dataset deepfish   # DeepFish, ~7.1 GB
-python download_data.py --dataset fishnet    # fishnet.ai v0.1.2, ~5.7 GB S3 (resumable curl)
+python download_data.py --dataset f4k        # Fish4Knowledge ~487 MB (resumable curl)
 
 # training
 python train.py --task fish --model all      # 4-backbone species benchmark
@@ -59,7 +59,7 @@ python train.py --task seg                   # fish-box U-Net
 # evaluation artefacts: metrics, leaderboards, confusion matrices, XAI grids
 python evaluate.py --task fish
 python evaluate.py --task coral
-python evaluate.py --enhancement --data datasets/fishnet/curated/train
+python evaluate.py --enhancement --data datasets/f4k/curated/train
 python evaluate.py --xai --image sample.jpg
 
 # inference
@@ -115,7 +115,7 @@ Every learned component stays under honest binary supervision — the graded out
 ├── src/
 │   ├── enhancement/  classification/  coral_analysis/  segmentation/
 │   ├── explainability/  realtime/  analytics/  reporting/  dashboard/
-│   ├── data/               # downloaders + prepare_fishnet
+│   ├── data/               # downloaders + prepare_f4k
 │   └── utils/  config/
 ├── notebooks/platform/     # 3 ready-to-run training notebooks (Kaggle/Colab/Lightning)
 ├── tests/                  # pytest: hand-computed metrics, contracts, CAMs, trackers
@@ -155,7 +155,7 @@ python -m pytest tests/ -q   # 91 unit tests: metric identities, WGBS math, CAMs
 
 ## 🙏 Datasets & citations
 
-- **fishnet.ai v0.1.2** (The Nature Conservancy) — https://www.fishnet.ai/download (arXiv:2106.09178)
+- **Fish4Knowledge (F4K)** — University of Edinburgh — https://homepages.inf.ed.ac.uk/rbf/Fish4Knowledge/GROUNDTRUTH/RECOG/ (27,370 verified fish crops, 23 species)
 - **DeepFish** (Scientific Reports 2020) — Saleh et al. — https://alzayats.github.io/DeepFish/
 - **NOAA PIFSC ESD Coral Bleaching** — https://huggingface.co/datasets/NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Dataset
 

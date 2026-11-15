@@ -63,6 +63,6 @@ Tip: start with `mobilenet_v3` (smallest) to validate the full loop, then run th
 ## 7. Evaluation & XAI after training
 ```bash
 python evaluate.py --task fish                       # metrics + leaderboard refresh
-python evaluate.py --enhancement --data datasets/fishnet/curated/train
+python evaluate.py --enhancement --data datasets/f4k/curated/train
 python evaluate.py --xai --image <sample.jpg>
 ```

@@ -6,8 +6,8 @@ device:
   num_workers: 2
 fish:
   batch_size: 64
-  raw_dir: /content/reefscan_data/fishnet/raw
-  data_dir: /content/reefscan_data/fishnet/curated
+  raw_dir: /content/reefscan_data/f4k/raw
+  data_dir: /content/reefscan_data/f4k/curated
 coral:
   batch_size: 64
   data_dir: /content/reefscan_data/coral/imagefolders

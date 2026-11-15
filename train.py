@@ -112,7 +112,7 @@ def train_classifier(task: str, model_name: str, cfg, device: torch.device,
     data_dir = Path(section.data_dir)
     if not data_dir.exists():
         hint = "python download_data.py" if task == "coral" else (
-            "python download_data.py --dataset fishnet && python download_data.py --prepare-fishnet"
+            "python download_data.py --dataset f4k && python download_data.py --prepare-f4k"
         )
         raise FileNotFoundError(
             f"{task} dataset not found at '{data_dir}'. Prepare it first ({hint}); "

@@ -2,30 +2,16 @@
 
 Three public, free datasets drive the system. `python download_data.py` fetches all of them.
 
-## 1. fishnet.ai v0.1.2 (The Nature Conservancy) — fish species from bbox crops
-- **Site:** https://www.fishnet.ai/download · **Paper:** arXiv:2106.09178
-- **Download:** official S3 mirror (quota-free, resumable): images 5.7 GB + labels 2.1 MB
-  (`https://fishnet-data.s3-us-west-1.amazonaws.com/foid_{images,labels}_v012.zip`) —
-  fetched by `src/data/downloaders/fishnet.py` via `curl -f -C -`.
-- **VERIFIED labels schema** (`foid_labels_bbox_v012.csv`):
-  `img_id, bbox_id, x_min, x_max, y_min, y_max, label_l1, label_l2` —
-  159,119 boxes over 34,987 frames; 28 `label_l1` classes (Albacore 33.9K,
-  Yellowfin tuna 6.7K, …, `Human` 104K), 13 `label_l2` codes.
-  No split column in v0.1.2 → `prepare_fishnet.py` derives a seeded
-  **image-level** 80/10/10 split (all crops of one frame share a split — no leakage).
-
-### Curated crop subset (why and how)
-Classification trains on **cropped fish regions** (matching the real-time pipeline):
-`Human`/`Unknown`/`No fish` rows are excluded; classes with <100 boxes dropped;
-top-12 kept (config: `fish.prepare.{level, top_k, min_images_per_class,
-exclude_classes, split_fractions}`). Output:
-
-```
-datasets/fishnet/curated/<split>/<CLASS>/<img_id>_bbox<id>.jpg
-```
-
-A `_COMPLETE` marker guards against partial runs: interrupted preparations resume
-per-crop, never silently train on a truncated set.
+## 1. Fish4Knowledge (F4K) — fish species classification
+- **Source:** official University of Edinburgh ground-truth mirror —
+  https://homepages.inf.ed.ac.uk/rbf/Fish4Knowledge/GROUNDTRUTH/RECOG/ (live, quota-free)
+- **Package:** single `fishRecognition_GT.tar` (487 MB, MD5 published alongside) + `class_id.csv` (0.6 MB)
+- **Verified content:** `fish_image/fish_01..fish_23/*.png` — 27,394 fish crops whose
+  **directory IS the species label** (fish_NN == cluster N; verified count-for-count against the
+  official `class_id.csv`: 27,370 rows, 23 clusters); matching `mask_image/mask_NN/` masks included
+- **Curation:** 13 of 23 clusters have ≥ 100 images (26,903 crops kept); seeded **video-group**
+  split 80/10/10 — crops of one video segment share a split (no scene-level leakage)
+- **Curated layout:** `datasets/f4k/curated/{train,validation,test}/<species_NN>/*.png`
 
 ## 2. DeepFish (Scientific Reports 2020) — fish presence & segmentation
 - **Site:** https://alzayats.github.io/DeepFish/ · **Mirror:** HF `Alzayats/DeepFish`

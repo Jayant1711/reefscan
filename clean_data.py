@@ -5,7 +5,7 @@ Examples
 --------
     python clean_data.py --dataset coral            # scan + report only
     python clean_data.py --dataset coral --apply    # move flagged files to _quarantine/
-    python clean_data.py --dataset fishnet --apply
+    python clean_data.py --dataset f4k --apply
     python clean_data.py --dataset seg --apply
 """
 
@@ -31,8 +31,8 @@ RECIPES = {
         "kind": "imagefolder",
         "dir": lambda cfg: Path(cfg.paths.data_root) / "coral" / "imagefolders",
     },
-    "fishnet": {
-        "target": "curated ImageFolder (corrupt + duplicates + leakage + class audit)",
+    "f4k": {
+        "target": "curated species ImageFolder (corrupt + duplicates + leakage + class audit)",
         "kind": "imagefolder",
         "dir": lambda cfg: Path(cfg.fish.data_dir),
     },
@@ -88,14 +88,14 @@ def main() -> int:
     if not target.exists():
         logger.error(
             "Dataset directory %s does not exist — run `python download_data.py --dataset %s` first.",
-            target, args.dataset if args.dataset != "fishnet" else "fishnet (+ --prepare-fishnet)",
+            target, args.dataset if args.dataset != "f4k" else "f4k (+ --prepare-f4k)",
         )
         return 2
     logger.info("Cleaning %s dataset at %s (apply=%s)", args.dataset, target, args.apply)
 
     if recipe["kind"] == "imagefolder":
         report = clean_imagefolder(target, apply=args.apply, report_path=report_path)
-        if args.dataset == "fishnet":
+        if args.dataset == "f4k":
             _audit_classes(target, report)
     else:
         report = clean_segmentation(target, apply=args.apply, report_path=report_path)

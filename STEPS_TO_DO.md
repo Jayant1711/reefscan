@@ -51,7 +51,7 @@ Duration: ~5–6 h of GPU (fish crops are large). Best attempted 06:00–10:00 I
 |---|---|
 | 2.1 | Go to https://colab.research.google.com → **File → Upload notebook** → pick `notebooks/platform/COLAB_training.ipynb`. |
 | 2.2 | **Runtime → Change runtime type → T4 GPU → Save.** |
-| 2.3 | **Runtime → Run all.** The notebook: clones the repo, installs deps, runs the test suite, downloads FishNet v0.1.2 from the fishnet.ai S3 mirror (5.7 GB), crops every fish bounding box into classification crops (~30–50 K crops across ~10 species classes), cleans them, trains all 4 backbones with feature extraction (~1.5 h), **auto-picks the winner** from the leaderboard and fine-tunes it (~1.5 h), runs XAI + enhancement benchmarks. |
+| 2.3 | **Runtime → Run all.** The notebook: clones the repo, installs deps, runs the test suite, downloads Fish4Knowledge from the official Edinburgh mirror (~487 MB tar), extracts the 27,370 verified species crops (23 clusters; ~13 classes with ≥100 images kept after curation),, cleans them, trains all 4 backbones with feature extraction (~1.5 h), **auto-picks the winner** from the leaderboard and fine-tunes it (~1.5 h), runs XAI + enhancement benchmarks. |
 | 2.4 | If the first cell hangs at *Allocating runtime* for >10 min: Runtime → **Disconnect and delete runtime**, then reconnect (free-tier capacity issue, not your fault). Off-peak hours almost always connect instantly. |
 | 2.5 | The final cell runs `files.download(...)` — your **browser saves `reefscan_artifacts_colab_<sha8>_<date>.zip` to `C:\Users\lenovo\Downloads\`**. Move it to `C:\reefscan_runs\artifacts\`. |
 | 2.6 | If the browser download is interrupted before the session dies: re-run only the last cell (it re-creates the zip). If the session already died — re-run the notebook; nothing needs re-typing. |
@@ -131,7 +131,7 @@ Duration: only the missing experiments. Free monthly credits (~15 T4 hours).
 | Colab: stuck at *Allocating runtime* | Free-tier capacity — disconnect & reconnect, or try off-peak (early morning IST). |
 | `CUDA out of memory` | Interrupt → re-run that step with `--set coral.batch_size=16` (or `fish.batch_size=16`, `seg.batch_size=8`). |
 | Kaggle Output panel empty | The notebook must run inside `/kaggle/working` — it does (clone cell uses that path). Check the last cell printed a zip name. |
-| FishNet download slow/fails | It comes from the fishnet.ai S3 mirror with resume (`curl -C -`); just re-run the cell — it resumes, it never restarts from zero. |
+| F4K download slow/fails | It comes from the official Edinburgh mirror with resume (`curl -C -`); re-run the cell — it resumes, it never restarts from zero. |
 | `pytest` fails on the platform | Copy the traceback, tell me — do not hand-edit cells; fix belongs in the repo (one `git pull` on the platform picks it up). |
 | Lightning credits exhausted | Everything resumes exactly where it stopped next month — manifests make re-runs skip completed work. |
 

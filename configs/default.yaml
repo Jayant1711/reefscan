@@ -63,15 +63,14 @@ enhancement:
 # ----------------------------------------------------------------------------
 fish:
   task_name: fish
-  raw_dir: datasets/fishnet/raw
-  data_dir: datasets/fishnet/curated   # ImageFolder layout (built by prepare_fishnet.py)
+  raw_dir: datasets/f4k/raw
+  data_dir: datasets/f4k/curated       # species ImageFolder (built by prepare_f4k.py)
   prepare:
-    # fishnet.ai (TNC) bbox-annotation schema: img_id, bbox_id, x/y_min/max, label_l1, label_l2
-    level: l1                # l1 = fine-grained species (28) | l2 = coarse codes (13)
-    top_k: 12                # keep the K classes with the most fish boxes
+    # Fish4Knowledge: 27,370 verified crops, 23 species clusters (fish_NN dirs);
+    # labels carried by the tar directory structure (verified vs class_id.csv)
+    top_k: 13                # clusters with >= 100 images
     min_images_per_class: 100
-    exclude_classes: [Human, Unknown, No fish]
-    split_fractions: [0.8, 0.1, 0.1]   # seeded IMAGE-level split (no crop leakage)
+    split_fractions: [0.8, 0.1, 0.1]   # seeded VIDEO-GROUP split (crops of one video share a split)
   image_size: 224
   batch_size: 32
   epochs: 15

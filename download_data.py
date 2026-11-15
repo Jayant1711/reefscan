@@ -6,8 +6,8 @@ Examples
     python download_data.py                       # everything (all 3 datasets + prepare)
     python download_data.py --dataset coral       # NOAA coral only (~770 MB)
     python download_data.py --dataset deepfish    # DeepFish tar (~7.1 GB)
-    python download_data.py --dataset fishnet     # fishnet.ai images 5.7 GB + labels 2.1 MB
-    python download_data.py --prepare-fishnet     # build curated subset from the raw archive
+    python download_data.py --dataset f4k         # Fish4Knowledge ~487 MB (resumable curl)
+    python download_data.py --prepare-f4k         # build curated species ImageFolder from the raw archive
 """
 
 from __future__ import annotations
@@ -27,9 +27,9 @@ logger = logging.getLogger("download")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--dataset", choices=["all", "fishnet", "deepfish", "coral"], default="all")
-    parser.add_argument("--prepare-fishnet", action="store_true",
-                        help="Only build the curated ImageFolder subset from the raw FishNet archive")
+    parser.add_argument("--dataset", choices=["all", "f4k", "deepfish", "coral"], default="all")
+    parser.add_argument("--prepare-f4k", "--prepare-fishnet", dest="prepare_f4k", action="store_true",
+                        help="Only build the curated species ImageFolder from the raw F4K archive")
     parser.add_argument("--platform", default=None,
                         choices=["kaggle", "colab", "lightning", "gpu", "local"],
                         help="Platform profile: aligns dataset paths with train.py --platform")
@@ -55,24 +55,22 @@ def apply_platform(cfg, platform: str | None):
         logger.warning("No platform profile at %s — using defaults.", overlay)
     return cfg
 
-def prepare_fishnet(cfg) -> None:
-    from src.data.prepare_fishnet import prepare_fishnet_subset
+def prepare_f4k(cfg) -> None:
+    from src.data.prepare_f4k import prepare_f4k_subset
 
     section = cfg.fish.prepare
     try:
-        out = prepare_fishnet_subset(
+        out = prepare_f4k_subset(
             raw_dir=Path(cfg.fish.raw_dir),
             out_dir=Path(cfg.fish.data_dir),
-            level=section.get("level", "l1"),
-            top_k=int(section.get("top_k", 12)),
             min_images_per_class=int(section.get("min_images_per_class", 100)),
-            exclude_classes=tuple(section.get("exclude_classes", ["Human", "Unknown", "No fish"])),
+            top_k=int(section.get("top_k", 13)),
             split_fractions=tuple(section.get("split_fractions", [0.8, 0.1, 0.1])),
         )
-        logger.info("Curated FishNet subset -> %s", out)
+        logger.info("Curated F4K subset -> %s", out)
     except FileNotFoundError as exc:
-        logger.warning("FishNet raw directory missing (%s).", exc)
-        logger.warning("Skipping FishNet subset preparation. To use FishNet, download the raw dataset into datasets/fishnet/raw/. See docs/DATASETS.md")
+        logger.warning("F4K raw directory missing (%s).", exc)
+        logger.warning("Skipping F4K subset preparation. To train on fish, download the raw F4K archive into datasets/f4k/raw/. See docs/DATASETS.md")
 
 
 def main() -> int:
@@ -82,8 +80,8 @@ def main() -> int:
     apply_platform(cfg, args.platform)
     override_from_args(cfg, args)
 
-    if args.prepare_fishnet:
-        prepare_fishnet(cfg)
+    if args.prepare_f4k or args.prepare_fishnet:
+        prepare_f4k(cfg)
         return 0
 
     root = Path(cfg.paths.data_root)
@@ -101,14 +99,14 @@ def main() -> int:
         path = download_deepfish(root / "deepfish")
         logger.info("✅ DeepFish ready -> %s", path)
 
-    if args.dataset in ("all", "fishnet"):
-        from src.data.downloaders import download_fishnet
+    if args.dataset in ("all", "f4k"):
+        from src.data.downloaders import download_f4k
 
-        fish_raw = Path(getattr(cfg.fish, "raw_dir", root / "fishnet" / "raw"))
+        fish_raw = Path(getattr(cfg.fish, "raw_dir", root / "f4k" / "raw"))
         fish_raw.mkdir(parents=True, exist_ok=True)
-        path = download_fishnet(fish_raw)
-        logger.info("✅ FishNet ready -> %s", path)
-        prepare_fishnet(cfg)
+        path = download_f4k(fish_raw)
+        logger.info("✅ F4K ready -> %s", path)
+        prepare_f4k(cfg)
 
     logger.info("All requested datasets ready. Next: python train.py --task fish --model resnet34")
     return 0

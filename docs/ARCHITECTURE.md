@@ -30,7 +30,7 @@ flowchart TB
 | `config` | YAML config, dot-access, CLI overrides | `DotDict`, `load_config` |
 | `utils` | logging, device, seeding, IO, plotting | `setup_logging`, `resolve_device` |
 | `enhancement` | 8 strategies + 4 metrics + selector | `Enhancer`, `EnhancementSelector` |
-| `data` | downloaders + FishNet subset builder | `download_coral`, `prepare_fishnet_subset` |
+| `data` | downloaders + FishNet subset builder | `download_coral`, `prepare_f4k_subset` |
 | `classification` | 4-backbone benchmark, balancing, engine, eval | `Trainer`, `build_dataloaders` |
 | `coral_analysis` | WGBS, risk, trend, health report | `BleachingAssessor`, `BleachingTrendAnalyzer` |
 | `segmentation` | U-Net, pair discovery, boxes | `SmallUNet`, `masks_to_boxes` |

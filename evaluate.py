@@ -5,7 +5,7 @@ Examples
 --------
     python evaluate.py --task fish
     python evaluate.py --task fish --model efficientnet_b0
-    python evaluate.py --enhancement --data datasets/fishnet/curated/train
+    python evaluate.py --enhancement --data datasets/f4k/curated/train
     python evaluate.py --xai --image sample.jpg
 """
 
@@ -112,12 +112,12 @@ def run_enhancement_benchmark_cli(cfg, data_dir: str | None) -> None:
 
 
 def _guess_sample_folder(cfg) -> Path:
-    for candidate in ("datasets/fishnet/curated/train", "datasets/coral/imagefolders/train",
+    for candidate in ("datasets/f4k/curated/train", "datasets/coral/imagefolders/train",
                       "datasets/synthetic/enhance"):
         path = Path(cfg.paths.data_root).parent / candidate if not candidate.startswith("datasets") else Path(candidate)
         if path.exists() and any(path.rglob("*.jpg")):
             return path
-    return Path("datasets/fishnet/curated/train")
+    return Path("datasets/f4k/curated/train")
 
 
 def run_xai_cli(cfg, image_path: str, device, task: str = "fish") -> None:

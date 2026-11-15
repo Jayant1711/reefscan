@@ -69,7 +69,7 @@ def page_home(cfg) -> None:
         """
 | Dataset | Role | Size |
 |---|---|---|
-| [FishNet (ICCV 2023)](https://fishnet-2023.github.io/) | Species classification (taxonomy-level subset) | 94,532 images · 17,357 species |
+| [FishNet (ICCV 2023)](https://f4k-2023.github.io/) | Species classification (taxonomy-level subset) | 94,532 images · 17,357 species |
 | [DeepFish (Sci. Reports 2020)](https://alzayats.github.io/DeepFish/) | Fish presence + segmentation (localization) | 39,766 frames · 620 masks |
 | [NOAA PIFSC ESD Coral Bleaching](https://huggingface.co/datasets/NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Dataset) | Coral vs bleached coral (binary) → WGBS severity | 10,419 patches |
 """

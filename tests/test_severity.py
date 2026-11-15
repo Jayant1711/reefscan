@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+pytest.importorskip("cv2", reason="OpenCV DLL blocked by local policy (flapping)")
+
 from src.coral_analysis.risk import coral_risk_score, risk_category
 from src.coral_analysis.severity import (
     SEVERITY_WEIGHTS,

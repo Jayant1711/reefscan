@@ -27,12 +27,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-FISHNET_LABELS_URL = "https://fishnet-data.s3-us-west-1.amazonaws.com/foid_labels_v012.zip"
-EXPECTED_FISHNET_COLUMNS = ("img_id", "bbox_id", "x_min", "x_max", "y_min", "y_max", "label_l1", "label_l2")
-EXPECTED_FISHNET_MIN_ROWS = 100_000          # release has 159,119 bbox rows
-EXPECTED_FISHNET_FRAMES = (30_000, 40_000)   # 34,987 in v0.1.2
-EXCLUDED_L1 = {"Human", "Unknown", "No fish"}
-EXPECTED_FISH_CLASSES = {"Albacore", "Yellowfin tuna", "Bigeye tuna"}  # three largest fish classes
+F4K_CLASS_ID_URL = "https://homepages.inf.ed.ac.uk/rbf/Fish4Knowledge/GROUNDTRUTH/RECOG/class_id.csv"
+F4K_TAR_URL = "https://homepages.inf.ed.ac.uk/rbf/Fish4Knowledge/GROUNDTRUTH/RECOG/Archive/fishRecognition_GT.tar"
+EXPECTED_F4K_COLUMNS = ("file_name", "cluster_id")
+EXPECTED_F4K_ROWS = (25_000, 30_000)         # 27,370 verified crops
+EXPECTED_F4K_CLUSTERS = 23                   # species clusters; 13 have >= 100 images
 
 CORAL_SIZE_URL = "https://datasets-server.huggingface.co/size?dataset=NMFS-OSI%2FNOAA-PIFSC-ESD-CORAL-Bleaching-Dataset"
 EXPECTED_CORAL_SPLITS = {"train": 7292, "validation": 1562, "test": 1565}
@@ -55,48 +54,36 @@ def _fetch(url: str, timeout: int = 60) -> bytes:
         return response.read()
 
 
-def verify_fishnet(checks: list[Check]) -> None:
+def verify_f4k(checks: list[Check]) -> None:
     try:
-        blob = _fetch(FISHNET_LABELS_URL, timeout=180)
+        blob = _fetch(F4K_CLASS_ID_URL, timeout=120)
     except Exception as exc:
-        checks.append(Check("FISHNET", "FAIL", f"labels zip unreachable at {FISHNET_LABELS_URL}: {exc} — retry; if it persists, the S3 mirror moved"))
+        checks.append(Check("F4K", "FAIL", f"class_id.csv unreachable at {F4K_CLASS_ID_URL}: {exc} — retry; if it persists, the Edinburgh mirror moved"))
         return
     try:
-        with zipfile.ZipFile(io.BytesIO(blob)) as zf:
-            members = [n for n in zf.namelist() if n.lower().endswith(".csv") and "__macosx" not in n.lower()]
-            non_freq = [n for n in members if "freq" not in n.lower()] or members
-            with zf.open(non_freq[0]) as fh:
-                text = io.TextIOWrapper(fh, encoding="utf-8")
-                reader = csv.DictReader(text)
-                columns = tuple(reader.fieldnames or [])
-                rows = list(reader)
+        reader = csv.DictReader(io.TextIOWrapper(io.BytesIO(blob), encoding="utf-8"))
+        columns = tuple(reader.fieldnames or [])
+        rows = list(reader)
     except Exception as exc:
-        checks.append(Check("FISHNET", "FAIL", f"labels CSV unreadable: {exc}"))
+        checks.append(Check("F4K", "FAIL", f"class_id.csv unreadable: {exc}"))
         return
 
-    if columns != EXPECTED_FISHNET_COLUMNS:
-        checks.append(Check("FISHNET", "FAIL",
-                            f"SCHEMA DRIFT — expected columns {EXPECTED_FISHNET_COLUMNS}, got {columns}. "
-                            "STOP: update prepare_fishnet.py before training."))
+    if columns != EXPECTED_F4K_COLUMNS:
+        checks.append(Check("F4K", "FAIL",
+                            f"SCHEMA DRIFT — expected columns {EXPECTED_F4K_COLUMNS}, got {columns}. "
+                            "STOP: update prepare_f4k.py before training."))
         return
 
-    frames = {r["img_id"] for r in rows}
-    classes = {r["label_l1"] for r in rows}
-    fish_classes = classes - EXCLUDED_L1
-    missing_big = EXPECTED_FISH_CLASSES - fish_classes
-    if missing_big:
-        checks.append(Check("FISHNET", "FAIL", f"SCHEMA DRIFT — expected fish classes missing: {sorted(missing_big)}"))
-        return
-
-    details = [f"{len(rows)} bbox rows", f"{len(frames)} frames", f"{len(classes)} L1 classes"]
+    clusters = {r["cluster_id"] for r in rows}
+    details = [f"{len(rows)} verified crops", f"{len(clusters)} species clusters"]
     status = "PASS"
-    if len(rows) < EXPECTED_FISHNET_MIN_ROWS:
+    if not EXPECTED_F4K_ROWS[0] <= len(rows) <= EXPECTED_F4K_ROWS[1]:
         status = "WARN"
-        details.append(f"rows below expected {EXPECTED_FISHNET_MIN_ROWS:,}")
-    if not EXPECTED_FISHNET_FRAMES[0] <= len(frames) <= EXPECTED_FISHNET_FRAMES[1]:
+        details.append(f"row count outside {EXPECTED_F4K_ROWS}")
+    if len(clusters) != EXPECTED_F4K_CLUSTERS:
         status = "WARN"
-        details.append(f"frame count outside {EXPECTED_FISHNET_FRAMES}")
-    checks.append(Check("FISHNET", status, "schema matches prepare_fishnet.py; " + "; ".join(details)))
+        details.append(f"cluster count {len(clusters)} != {EXPECTED_F4K_CLUSTERS}")
+    checks.append(Check("F4K", status, "schema matches prepare_f4k.py; " + "; ".join(details)))
 
 
 def verify_coral(checks: list[Check]) -> None:
@@ -164,7 +151,7 @@ def main() -> int:
     args = parser.parse_args()
 
     checks: list[Check] = []
-    verify_fishnet(checks)
+    verify_f4k(checks)
     verify_coral(checks)
     verify_deepfish(checks)
 

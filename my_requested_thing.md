@@ -13,20 +13,20 @@
 | Dataset | Task | Size | Splits | Chosen because |
 |---|---|---|---|---|
 | **NOAA PIFSC ESD Coral Bleaching** (`NMFS-OSI/…` on HuggingFace) | coral binary CORAL vs CORAL_BL (+ WGBS severity layer) | 10,419 × 224 px (~770 MB) | train 7,292 / validation 1,562 / test 1,565 | Only public bleaching dataset with honest labels; binary supervision is the basis of the WGBS severity innovation |
-| **fishnet.ai v0.1.2** (The Nature Conservancy, fishnet.ai/download, S3 mirror) | fish species classification from **bbox crops** | labels 2.1 MB CSV + images 5.7 GB; **verified schema**: `img_id, bbox_id, x_min, x_max, y_min, y_max, label_l1, label_l2` — 159,119 boxes / 34,987 frames / 28 L1 species classes (top: Albacore 33.9K, Yellowfin tuna 6.7K, Bigeye tuna 2.8K, Opah 1.6K, Mahi 1.1K…) / 13 L2 codes | derived **seeded image-level split** 80/10/10 (no official split column in v0.1.2; every crop of one frame stays in one split — no leakage) | Real EM-camera fish imagery with species labels; `Human`(104K)/`Unknown`/`No fish` boxes excluded; classes with <100 boxes dropped → ~10–12 species classes; crops mirror the real-time pipeline's per-box classification |
+| **Fish4Knowledge v1 (F4K)** (University of Edinburgh, official GROUNDTRUTH mirror) | fish species classification from **verified crops** | single 487 MB tar + 0.6 MB class_id.csv; **verified layout**: `fish_image/fish_01..23/*.png` — 27,394 crops whose **directory IS the species label** (fish_NN == cluster N, verified count-for-count vs the official class_id.csv: 27,370 rows, 23 clusters); matching `mask_image/` masks included (future segmentation bonus) | seeded **video-group split** 80/10/10 (crops of one video segment share a split — prevents scene-level leakage) | Real reef-camera fish imagery with expert-verified species clusters; 13 of 23 clusters have ≥ 100 images (26,903 imgs kept); far cleaner than fishnet.ai (no bbox plumbing, no Human/No-fish exclusions, no missing-image gap) |
 | **DeepFish** (`Alzayats/DeepFish` on HF) | fish segmentation → detection boxes | 620 pixel masks from 39,766 frames (~7.1 GB tar) | 80/20 seeded split (seed 42) | Only free dataset with paired Full-HD frames + pixel masks; feeds the real-time box/counting pipeline |
 
-Download: `python download_data.py --dataset {coral,fishnet,deepfish}` — idempotent via completion markers; an *interrupted* download re-runs cleanly (partial archives resume, incomplete extractions are never mistaken for done).
-FishNet preparation (`src/data/prepare_fishnet.py`) is written against the **verified** v0.1.2 schema and crops every fish bbox with a 5% context margin; schema changes raise an explicit diagnostic.
+Download: `python download_data.py --dataset {coral,f4k,deepfish}` — idempotent via completion markers; an *interrupted* download re-runs cleanly (partial archives resume, incomplete extractions are never mistaken for done).
+F4K preparation (`src/data/prepare_f4k.py`) is written against the **verified** tar layout (labels carried by `fish_NN` directories); schema changes raise an explicit diagnostic.
 
 ## 2. Data cleaning (applied before every training run)
 
-Command: `python clean_data.py --dataset {coral,fishnet,seg} --apply` (report-only without `--apply`; nothing is deleted — flagged files move to `<root>/_quarantine/<reason>/`).
+Command: `python clean_data.py --dataset {coral,f4k,seg} --apply` (report-only without `--apply`; nothing is deleted — flagged files move to `<root>/_quarantine/<reason>/`).
 
 | Dataset | Recipe | Report |
 |---|---|---|
 | coral | corrupt/decode scan (PIL verify), min-size 32 px, exact-dup (MD5), near-dup (8×8 dHash), **train↔val↔test leakage** via dHash overlap | `results/cleaning/coral_cleaning_report.json` |
-| fishnet (bbox crops) | same as coral + class-count audit (warn < 10 crops) | `results/cleaning/fishnet_cleaning_report.json` |
+| f4k (species crops) | same as coral + class-count audit (warn < 10 crops) | `results/cleaning/f4k_cleaning_report.json` |
 | seg (DeepFish) | image↔mask pairing validation, corrupt scan, **min mask-area** filter (foreground < 1% quarantined) | `results/cleaning/seg_cleaning_report.json` |
 
 Cleaning report snapshot: *(fill after first platform run)*
