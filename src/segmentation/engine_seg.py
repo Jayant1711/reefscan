@@ -26,8 +26,36 @@ from .unet import SmallUNet
 
 logger = get_logger("seg.dataset")
 
-MASK_HINTS = ("mask", "label", "segment", "annotation", "gt")
+MASK_HINTS = ("mask", "masks", "label", "segment", "annotation", "gt")
+QUARANTINE = "_quarantine"
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp"}
+
+
+_MASK_EXACT_DIRS = {"masks", "mask", "labels", "label", "gt", "groundtruth", "annotations", "annotation"}
+_IMAGE_EXACT_DIRS = {"images", "imgs", "image", "frames"}
+
+
+def _classify_member(path: Path) -> str:
+    """Classify a file as 'mask' or 'image' by its ancestor directory names.
+
+    Real DeepFish layout: masks live under .../masks/<split>/ where the
+    IMMEDIATE parent is the split name — so ancestor dirs must be checked by
+    EXACT name. Substring hints cannot be used on ancestors: the dataset's own
+    'Segmentation' parent contains the 'segment' hint and would classify the
+    images as masks (verified against the real release, 2026-11-15).
+    """
+    exact = {p.lower() for p in path.parts[:-1]}
+    if exact & _MASK_EXACT_DIRS:
+        return "mask"
+    if exact & _IMAGE_EXACT_DIRS:
+        return "image"
+    stem = path.stem.lower()
+    if stem.endswith(("_mask", "_seg", "_label")):
+        return "mask"
+    parent = parts_last = (path.parent.name or "").lower()
+    if any(h in parent for h in MASK_HINTS):
+        return "mask"
+    return "image"
 
 
 def discover_pairs(data_dir: str | Path) -> list[tuple[Path, Path]]:
@@ -38,12 +66,15 @@ def discover_pairs(data_dir: str | Path) -> list[tuple[Path, Path]]:
     for path in data_dir.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in IMG_EXTS:
             continue
-        parent = path.parent.name.lower()
+        if QUARANTINE in path.parts:
+            continue
         stem = path.stem.lower()
-        if any(h in parent for h in MASK_HINTS) or stem.endswith(("_mask", "_seg", "_label")):
-            masks_by_stem[stem.replace("_mask", "").replace("_seg", "").replace("_label", "")] = path
+        kind = _classify_member(path)
+        if kind == "mask":
+            clean = stem.replace("_mask", "").replace("_seg", "").replace("_label", "")
+            masks_by_stem.setdefault(clean, path)
         else:
-            images_by_stem[stem] = path
+            images_by_stem.setdefault(stem, path)
 
     pairs = [(img, masks_by_stem[stem]) for stem, img in images_by_stem.items() if stem in masks_by_stem]
     logger.info("Discovered %d image/mask pairs under %s", len(pairs), data_dir)

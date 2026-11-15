@@ -4,12 +4,20 @@ Repo: https://huggingface.co/datasets/NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Da
 Binary labels: CORAL (healthy hard coral) vs CORAL_BL (bleached hard coral).
 Splits: train 7,292 / validation 1,562 / test 1,565 — 224x224 patches.
 
-Two access paths:
-  1. ``datasets`` library (preferred; auto-converts to parquet).
-  2. Direct parquet download via huggingface_hub + pyarrow (fallback).
-Both materialise a local ImageFolder tree used by the training pipeline:
+**Verified release layout (2026-11-15, HF tree API):** the repo is an
+ImageFolder dataset — labels live in the **directory names** of the repo tree:
 
-    datasets/coral/imagefolders/{train,validation,test}/{CORAL,CORAL_BL}/*.jpg
+    train/CORAL/*.PNG   train/CORAL_BL/*.PNG
+    val/CORAL/*.PNG     val/CORAL_BL/*.PNG
+    test/CORAL/*.PNG    test/CORAL_BL/*.PNG
+
+The datasets-server parquet conversion carries **no label column** (only
+`image`) — which is what broke the original `load_dataset`-based downloader
+(KeyError: 'label'). This downloader therefore bypasses conversions entirely:
+it `snapshot_download`s the ImageFolder split/class directories and
+materialises the training ImageFolder from the authoritative directory labels:
+
+    datasets/coral/imagefolders/{train,validation,test}/{CORAL,CORAL_BL}/*.PNG
 """
 
 from __future__ import annotations
@@ -20,8 +28,12 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 CORAL_REPO = "NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Dataset"
-CLASS_NAMES = ["CORAL", "CORAL_BL"]
-SPLIT_DIRS = {"train": "train", "validation": "validation", "test": "test"}
+CLASS_NAMES = ("CORAL", "CORAL_BL")
+# Verified split sizes (datasets-server + repo tree, 2026-11-15) — used as a
+# download-time drift alarm (WARN only: upstream may legitimately grow).
+EXPECTED_CORAL_SPLITS = {"train": 7292, "val": 1562, "test": 1565}
+IMG_EXTS = {".png", ".jpg", ".jpeg"}
+SNAPSHOT_PATTERNS = ["train/**", "val/**", "test/**"]
 
 
 def _imagefolder_ready(root: Path, min_images: int = 100) -> bool:
@@ -46,95 +58,32 @@ def _imagefolder_ready(root: Path, min_images: int = 100) -> bool:
     return True
 
 
-def _save_via_datasets(root: Path) -> Path:
-    from datasets import load_dataset
+def _materialise_imagefolder(snapshot_dir: Path, root: Path) -> dict[str, int]:
+    """Copy the snapshot's split/class dirs into the training ImageFolder layout.
 
-    ds = load_dataset(CORAL_REPO)
-    sample_split = next(iter(ds.keys()))
-    features = ds[sample_split].features
-    cols = ds[sample_split].column_names
+    Repo split names: train / val / test. Training contract: train / validation / test.
+    """
+    import shutil
 
-    img_col = "image" if "image" in cols else next((c for c in cols if "img" in c or "image" in c), cols[0])
-    label_col = "label" if "label" in cols else ("labels" if "labels" in cols else next((c for c in cols if "label" in c or "class" in c or "target" in c), None))
-
-    label_names = CLASS_NAMES
-    if label_col and label_col in features and hasattr(features[label_col], "names"):
-        label_names = features[label_col].names
-    logger.info("HF coral cols: %s | img_col: %s | label_col: %s | label_names: %s", cols, img_col, label_col, label_names)
-
-    import cv2
-    import numpy as np
-
-    for split in SPLIT_DIRS.keys():
-        if split not in ds:
-            continue
-        for idx, example in enumerate(ds[split]):
-            raw_img = example[img_col]
-            img = np.array(raw_img.convert("RGB") if hasattr(raw_img, "convert") else raw_img)
-            
-            if label_col is not None and label_col in example:
-                raw_label = example[label_col]
-                if isinstance(raw_label, int):
-                    label_str = str(label_names[raw_label]) if raw_label < len(label_names) else str(raw_label)
-                else:
-                    label_str = str(raw_label)
-            else:
-                label_str = "unknown"
-
-            out_dir = root / split / label_str
-            out_dir.mkdir(parents=True, exist_ok=True)
-            bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(str(out_dir / f"{split}_{idx:06d}.jpg"), bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
-    return root
-
-
-def _save_via_parquet(root: Path) -> Path:
-    from huggingface_hub import snapshot_download
-    import pandas as pd
-    import pyarrow.parquet as pq
-
-    local = Path(
-        snapshot_download(repo_id=CORAL_REPO, repo_type="dataset", allow_patterns=["**/*.parquet"])
-    )
-    parquets = sorted(local.rglob("*.parquet"))
-    if not parquets:
-        raise FileNotFoundError(f"No parquet shards found in {local}")
-
-    import cv2
-    import numpy as np
-
-    # Discover class names: ClassLabel features embedded in parquet metadata.
-    names: list[str] | None = None
-    counter: dict[str, int] = {}
-    for pq_path in parquets:
-        split = pq_path.stem.split("-")[0]
-        split = SPLIT_DIRS.get(split, split)
-        table = pq.read_table(pq_path, columns=["image", "label"]) if "image" in pq.read_schema(pq_path).names else None
-        if table is None:
-            continue
-        if names is None:
-            feat = pq.read_schema(pq_path).field("label").type
-            hf_feat = None
-            try:  # ClassLabel exposes names via the HF extension type metadata
-                hf_feat = pq.read_schema(pq_path).field("label")
-                names = list(hf_feat.metadata["hextras"]["names"].values()) if hf_feat.metadata and "hextras" in str(hf_feat.metadata) else None
-            except Exception:
-                names = None
-            if names is None:
-                names = CLASS_NAMES  # ClassLabel stores names alphabetically
-            logger.info("Coral class names resolved to: %s", names)
-
-        df = table.to_pandas()
-        for idx, row in df.iterrows():
-            img_bytes = row["image"]["bytes"] if isinstance(row["image"], dict) else row["image"]
-            label = int(row["label"])
-            out_dir = root / split / str(names[label])
-            out_dir.mkdir(parents=True, exist_ok=True)
-            arr = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
-            fname = f"{split}_{counter.get(split, 0):06d}.jpg"
-            counter[split] = counter.get(split, 0) + 1
-            cv2.imwrite(str(out_dir / fname), arr, [cv2.IMWRITE_JPEG_QUALITY, 95])
-    return root
+    rename = {"train": "train", "val": "validation", "test": "test"}
+    counts: dict[str, int] = {}
+    for src_split, dst_split in rename.items():
+        for cls in CLASS_NAMES:
+            src = snapshot_dir / src_split / cls
+            if not src.is_dir():
+                continue
+            dst = root / dst_split / cls
+            dst.mkdir(parents=True, exist_ok=True)
+            n = 0
+            for f in sorted(src.iterdir()):
+                if f.suffix.lower() not in IMG_EXTS:
+                    continue
+                target = dst / f.name
+                if not target.exists():
+                    shutil.copy2(f, target)
+                n += 1
+            counts[f"{dst_split}/{cls}"] = counts.get(f"{dst_split}/{cls}", 0) + n
+    return counts
 
 
 def download_coral(data_dir: str | Path, force: bool = False) -> Path:
@@ -147,14 +96,37 @@ def download_coral(data_dir: str | Path, force: bool = False) -> Path:
         logger.info("Coral ImageFolders already present at %s — skipping.", root)
         return root
 
-    try:
-        logger.info("Loading NOAA coral dataset via `datasets` ...")
-        _save_via_datasets(root)
-    except Exception as exc:
-        logger.warning("`datasets` download failed (%s) — falling back to parquet + pyarrow ...", exc)
-        _save_via_parquet(root)
+    from huggingface_hub import snapshot_download
+
+    logger.info("Downloading NOAA coral ImageFolder splits via snapshot_download ...")
+    snapshot_dir = Path(
+        snapshot_download(
+            repo_id=CORAL_REPO,
+            repo_type="dataset",
+            allow_patterns=SNAPSHOT_PATTERNS,
+        )
+    )
+
+    counts = _materialise_imagefolder(snapshot_dir, root)
+    total = sum(counts.values())
+    logger.info("Materialised: %s", counts)
+
+    # Download-time drift alarm: compare against the documented split sizes.
+    got = {"train": counts.get("train/CORAL", 0) + counts.get("train/CORAL_BL", 0),
+           "val": counts.get("validation/CORAL", 0) + counts.get("validation/CORAL_BL", 0),
+           "test": counts.get("test/CORAL", 0) + counts.get("test/CORAL_BL", 0)}
+    for split, expected in EXPECTED_CORAL_SPLITS.items():
+        if got[split] and abs(got[split] - expected) > expected * 0.05:
+            logger.warning("Split '%s' has %d images (documented: %d) — upstream may have changed.",
+                           split, got[split], expected)
+
+    if not _imagefolder_ready(root):
+        raise RuntimeError(
+            f"Coral ImageFolder incomplete at {root} — got {counts}. "
+            "Check the snapshot download and re-run."
+        )
 
     (root.parent / "_COMPLETE").write_text("ok\n", encoding="utf-8")
-    n = sum(1 for _ in root.rglob("*.jpg"))
+    n = sum(1 for _ in root.rglob("*.jpg")) + sum(1 for _ in root.rglob("*.png"))
     logger.info("Coral dataset ready: %d images under %s", n, root)
     return root

@@ -27,6 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+UA = {"User-Agent": "reefscan-verify/1.0"}
 F4K_CLASS_ID_URL = "https://homepages.inf.ed.ac.uk/rbf/Fish4Knowledge/GROUNDTRUTH/RECOG/class_id.csv"
 F4K_TAR_URL = "https://homepages.inf.ed.ac.uk/rbf/Fish4Knowledge/GROUNDTRUTH/RECOG/Archive/fishRecognition_GT.tar"
 EXPECTED_F4K_COLUMNS = ("file_name", "cluster_id")
@@ -87,44 +88,48 @@ def verify_f4k(checks: list[Check]) -> None:
 
 
 def verify_coral(checks: list[Check]) -> None:
+    """NOAA coral is an ImageFolder dataset: labels live in the repo tree dirs
+    (train/CORAL, train/CORAL_BL, val/..., test/...). Count the actual files in
+    the repo tree — authoritative, unlike the datasets-server viewer which
+    reports only the image column."""
+    import urllib.request as _u
+
+    per_split = {}
     try:
-        payload = json.loads(_fetch(CORAL_SIZE_URL, timeout=60).decode("utf-8"))
+        url = "https://huggingface.co/api/datasets/NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Dataset/tree/main?recursive=true"
+        while url:
+            req = _u.Request(url, headers=UA)
+            with _u.urlopen(req, timeout=90) as resp:
+                page = json.loads(resp.read().decode("utf-8"))
+                link = resp.headers.get("Link", "")
+            for entry in page:
+                path = entry.get("path", "")
+                parts = path.split("/")
+                if entry.get("type") == "file" and len(parts) == 3 and parts[0] in ("train", "val", "test")                         and parts[2].lower().endswith((".png", ".jpg", ".jpeg")):
+                    key = {"val": "validation"}.get(parts[0], parts[0])
+                    per_split.setdefault(key, 0)
+                    per_split[key] += 1
+            # HF pagination: <url>; rel="next"
+            nxt = None
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    nxt = part.split("<")[1].split(">")[0].strip()
+            url = nxt  # None when exhausted
     except Exception as exc:
-        checks.append(Check("CORAL", "FAIL", f"HF datasets-server unreachable: {exc} — retry"))
+        checks.append(Check("CORAL", "FAIL", f"HF tree API unreachable: {exc} — retry"))
         return
-    size_entry = payload.get("size", {}).get("dataset") or {}
-    splits = {s["split"]: s["num_rows"] for s in size_entry.get("splits", [])}
-    if not splits:
-        # /size cache may be pending — fall back to the dataset card, which
-        # documents the split table (7,292 / 1,562 / 1,565).
-        try:
-            card = _fetch(
-                "https://huggingface.co/datasets/NMFS-OSI/NOAA-PIFSC-ESD-CORAL-Bleaching-Dataset/resolve/main/README.md",
-                timeout=60,
-            ).decode("utf-8", errors="replace")
-        except Exception as exc:
-            checks.append(Check("CORAL", "WARN", f"could not verify splits (datasets-server pending, card fetch failed: {exc})"))
-            return
-        found = {}
-        for split, count in EXPECTED_CORAL_SPLITS.items():
-            for needle in (f"{count:,}", str(count)):
-                if needle in card:
-                    found[split] = count
-                    break
-        if set(found) == set(EXPECTED_CORAL_SPLITS):
-            checks.append(Check("CORAL", "PASS", "dataset card documents the expected split table: "
-                                + ", ".join(f"{k}={v:,}" for k, v in EXPECTED_CORAL_SPLITS.items())))
-        else:
-            missing = set(EXPECTED_CORAL_SPLITS) - set(found)
-            checks.append(Check("CORAL", "WARN", f"dataset card does not document splits {sorted(missing)} — verify manually on the HF page"))
-        return
-    problems = [f"{s}: {splits.get(s)} != {n}" for s, n in EXPECTED_CORAL_SPLITS.items() if splits.get(s) != n]
+    total = sum(per_split.values())
+    if total < 10_000:
+        checks.append(Check("CORAL", "WARN", f"tree listing returned only {total} files — pagination may be incomplete; re-run"))
+    problems = [f"{s}: {per_split.get(s, 0)} != {n}" for s, n in EXPECTED_CORAL_SPLITS.items() if per_split.get(s, 0) != n]
     if problems:
-        checks.append(Check("CORAL", "FAIL", "SCHEMA DRIFT — split sizes changed: " + "; ".join(problems)))
+        checks.append(Check("CORAL", "FAIL", "SCHEMA DRIFT — split file counts changed: " + "; ".join(problems)))
         return
+    total = sum(per_split.values())
     checks.append(Check("CORAL", "PASS",
-                        f"splits match code expectations: " + ", ".join(f"{k}={v:,}" for k, v in EXPECTED_CORAL_SPLITS.items())
-                        + f" (classes {CORAL_CLASSES} pinned by tests)"))
+                        f"ImageFolder tree verified: {total:,} PNGs across splits — "
+                        + ", ".join(f"{k}={v:,}" for k, v in EXPECTED_CORAL_SPLITS.items())
+                        + f" (classes {CORAL_CLASSES} = directory names, pinned by tests)"))
 
 
 def verify_deepfish(checks: list[Check]) -> None:
