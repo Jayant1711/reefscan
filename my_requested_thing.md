@@ -29,7 +29,9 @@ Command: `python clean_data.py --dataset {coral,f4k,seg} --apply` (report-only w
 | f4k (species crops) | same as coral + class-count audit (warn < 10 crops) | `results/cleaning/f4k_cleaning_report.json` |
 | seg (DeepFish) | image↔mask pairing validation, corrupt scan, **min mask-area** filter (foreground < 1% quarantined) | `results/cleaning/seg_cleaning_report.json` |
 
-Cleaning report snapshot: *(fill after first platform run)*
+Cleaning report snapshot (F4K, measured locally on the real curated crops, 2026-11-15):
+scanned 26,903 · corrupt 0 · too-small 5 · duplicate images 686 · leaked images 152 → **691 quarantined** (26,212 usable).
+Report: `results/cleaning/f4k_cleaning_report.json`.
 
 ## 3. Models considered (screen → fine-tune protocol)
 

@@ -199,8 +199,8 @@ def run_preflight(platform: str | None, task: str, with_pytest: bool, config_pat
 
     # CLEANING reports
     clean_notes = []
-    for name in ("coral", "fishnet", "seg"):
-        if name == "fishnet" and "fish" not in tasks:
+    for name in ("coral", "f4k", "seg"):
+        if name == "f4k" and "fish" not in tasks:
             continue
         if name in ("coral", "seg") and name not in tasks and task != "all":
             continue

@@ -55,7 +55,7 @@ def build_dataloaders(
 ) -> LoaderBundle:
     """Build train/val/test loaders from an ImageFolder tree.
 
-    Expected layout (built by prepare_fishnet.py / coral downloader)::
+    Expected layout (built by prepare_f4k.py / coral downloader)::
 
         data_dir/train/<class>/*.jpg
         data_dir/validation/<class>/*.jpg      (or val/)

@@ -8,8 +8,8 @@ silently mislabelling data. Exit codes: 0 = all sources match, 1 = mismatch/unre
 
 Checks
 ------
-- fishnet.ai v0.1.2 labels zip (2.1 MB, S3): exact columns
-  img_id, bbox_id, x_min, x_max, y_min, y_max, label_l1, label_l2; row/frame/class sanity
+- Fish4Knowledge (F4K) class_id.csv (0.6 MB, Edinburgh mirror): exact columns
+  file_name, cluster_id; verified-crop/cluster sanity (27,370 crops, 23 species)
 - NOAA coral (HuggingFace datasets-server): splits 7,292 / 1,562 / 1,565; label names CORAL, CORAL_BL
 - DeepFish (HuggingFace): DeepFish.tar present with expected size (~7.1 GB)
 """
