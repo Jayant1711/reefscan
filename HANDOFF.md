@@ -72,7 +72,7 @@ Must print `CUDA: True`. If False on Windows → you installed the CPU wheel; re
 pip install -r requirements.txt -c constraints.txt
 python -m pytest tests/ -q
 ```
-✅ Verify: **91 tests collected, all pass** (one may skip: ONNX parity needs `onnxruntime` — optional). If any test fails, STOP and report the traceback to the owner — do not patch the repo yourself.
+✅ Verify: **102 tests collected, all pass** (one may skip: ONNX parity needs `onnxruntime` — optional). If any test fails, STOP and report the traceback to the owner — do not patch the repo yourself.
 
 ## Step 3b — Verify the ONLINE dataset sources (metadata-only, ~1 min, before any download)
 
@@ -179,53 +179,59 @@ platform in `my_requested_thing.md` §6 — E1–E3 coral/seg, E4–E5 fish).
 
 ```text
 You are operating the ReefScan AI repository — a final-year underwater computer-vision
-system (underwater image enhancement -> fish species classification -> coral bleaching
-severity -> fish detection/tracking -> biodiversity analytics -> PDF reports + dashboard).
-Full runbook: HANDOFF.md at the repo root. Dataset→model mapping and the experiment
-matrix are in my_requested_thing.md §1 and §4/§6.
+system: underwater image enhancement -> fish species classification (Fish4Knowledge
+crops) -> coral bleaching severity (NOAA patches, WGBS estimator) -> fish detection
+(U-Net on DeepFish masks) -> biodiversity analytics -> PDF reports + Streamlit dashboard.
+Full runbook: HANDOFF.md at the repo root. Dataset→model mapping + experiment matrix:
+my_requested_thing.md §1/§4/§6.
 
-MISSION: run the complete training matrix E1–E6 on the best GPU available to you
-(preference: a linked Colab GPU first — use notebooks/platform/COLAB_training.ipynb or
-the CLI there with --platform colab; otherwise this machine's NVIDIA GPU with
---platform gpu; NEVER train on CPU-only machines), then produce and hand back the
-artefacts we could not produce on the owner's GPU-less laptop: trained checkpoints,
-leaderboards with average-precision metrics, segmentation IoU/Dice/box-AP50, per-run
-manifests, the filled experiment ledger, and the final model-selection comparison.
+REPO: https://github.com/Jayant1711/reefscan  (clone it if not already present)
 
-Execute, in order, verifying after every step:
+MISSION: run the complete training matrix E1–E6 on the best GPU available to you —
+preference: a linked Colab GPU first (use notebooks/platform/COLAB_training.ipynb or the
+CLI there with --platform colab); otherwise THIS machine's NVIDIA GPU (--platform gpu).
+NEVER train on CPU-only machines. Deliver every artefact the owner's GPU-less laptop
+could not produce: trained checkpoints, leaderboards with average-precision metrics,
+segmentation IoU/Dice/box-AP50, per-run manifests, the filled experiment ledger, the
+final model-selection comparison, and the bundled artifact zip.
+
+Execute in order, verifying after every step:
 
 1. Environment (HANDOFF.md Steps 0–3): Python 3.11+ venv; install CUDA torch
-   (on Windows the default pip wheel is CPU-only — use the cu1xx index) with
+   (Windows: default pip wheel is CPU-only — use the cu1xx index) with
    -c constraints.txt; then pip install -r requirements.txt -c constraints.txt.
-   VERIFY: python -m pytest tests/ -q must pass (91 tests) and
-   python -c "import torch; print(torch.cuda.is_available())" must be True on
-   the training machine.
+   VERIFY: python -m pytest tests/ -q (102 tests) must pass, and
+   python -c "import torch; print(torch.cuda.is_available())" must be True.
+   NOTE: if imports crash with "WinError 4551 / Application Control policy has
+   blocked this file", that is a WINDOWS machine policy (torch/pyarrow/matplotlib
+   DLLs), NOT a repo bug — do NOT edit the repo; try reinstalling the affected
+   package, then report to the user if it persists (the owner's laptop had the
+   same policy and it later resolved itself).
 
 2. Dataset-source verification (BEFORE the multi-GB downloads):
    python scripts/verify_online_data.py
-   All three checks (F4K, CORAL, DEEPFISH) must PASS. A "SCHEMA DRIFT — FAIL"
-   means the upstream release changed: STOP and tell the user — do not patch
-   the code yourself.
+   All three checks (F4K, CORAL, DEEPFISH) must PASS — schema drift on any
+   upstream source means STOP and report to the user; do not patch the code.
 
 3. Data (HANDOFF.md Step 4): download all three datasets with --platform matching
-   your compute (gpu on the workstation, colab on Colab), then clean each with
-   clean_data.py --apply. VERIFY: results/cleaning/*_cleaning_report.json exist
-   and per-split images appear under datasets/<name>/curated or imagefolders.
+   your compute, then clean each with clean_data.py --apply. VERIFY:
+   results/cleaning/*_cleaning_report.json exist and curated/imagefolder trees
+   are populated (F4K ~26 K crops across 13 species classes).
 
-4. Pre-flight gate (Step 6): python scripts/preflight.py --platform <your
-   platform> --task coral,seg,fish,fishnet... (use --task all) — must exit 0.
-   A FAIL halts the run: fix the environment, not the code.
+4. Pre-flight gate (Step 6): python scripts/preflight.py --platform <compute>
+   --task all — must exit 0. A FAIL halts the run: fix the environment, not the code.
 
 5. Training matrix (HANDOFF.md Step 7) — dataset→model mapping:
-   - E1  coral:      train.py --task coral --model all --strategy feature_extraction
-   - E2  coral:      fine-tune the top-2 by weighted_f1 among FE rows
-                     (+ optional partial_finetune on the winner, non-fatal)
-   - E3  segment:    train.py --task seg  (U-Net on DeepFish masks), then
-                     evaluate.py --task seg (IoU/Dice/pixel-AP/box-AP50)
-   - E4  fish:       train.py --task fish --model all --strategy feature_extraction
-                     (Fish4Knowledge crops; F4K = the species dataset)
-   - E5  fish:       fine-tune the E4 FE-screen winner
-   - E6  evaluate:   evaluate.py --task coral / --task fish / --enhancement / --xai
+   - E1  coral:   train.py --task coral --model all --strategy feature_extraction
+                  (NOAA coral patches)
+   - E2  coral:   fine-tune the top-2 by weighted_f1 among FE rows
+                  (+ optional partial_finetune on the winner, non-fatal)
+   - E3  seg:     train.py --task seg (U-Net on DeepFish masks), then
+                  evaluate.py --task seg (IoU/Dice/pixel-AP/box-AP50)
+   - E4  fish:    train.py --task fish --model all --strategy feature_extraction
+                  (F4K species crops)
+   - E5  fish:    fine-tune the E4 FE-screen winner
+   - E6  eval:    evaluate.py --task coral / --task fish / --enhancement / --xai
    Use --continue on every train.py call (idempotent — completed runs are skipped)
    and the matching --platform on every CLI call. One CUDA OOM is caught per
    backbone automatically; retry that backbone with --set <task>.batch_size=32.
@@ -235,14 +241,14 @@ Execute, in order, verifying after every step:
    python scripts/compare_runs.py       # writes results/comparison/final_comparison.csv
                                         # and the FINAL SELECTION into the ledger
    python scripts/export_artifacts.py   # bundles models/results/runs/reports into one zip
-   Hand back the zip to the user AND push the results/local-gpu (or colab) branch with
+   Hand the zip back to the user AND push the results/local-gpu (or colab) branch with
    the committable results (comparison + cleaning reports).
 
 RULES: never edit source/config files to fix a failure — report it to the user;
 never skip preflight or the pytest gate; re-run scripts/verify_online_data.py if a
 download fails mid-way (upstream may have drifted); --continue on every training call;
-prefer Colab GPU over the workstation GPU; do not run run_smoke_test.py on the
-training box mid-matrix. Report every traceback verbatim to the user.
+prefer the linked Colab GPU over this machine's GPU; do not run run_smoke_test.py on
+the training box mid-matrix. Report every traceback verbatim to the user.
 ```
 
 ---
