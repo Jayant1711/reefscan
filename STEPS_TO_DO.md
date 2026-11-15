@@ -23,6 +23,8 @@ has run and you have downloaded the zip. Sessions die; your laptop does not.
 
 ---
 
+> **Alternative:** a dedicated NVIDIA-GPU PC can run the *entire* matrix locally — see **[HANDOFF.md](HANDOFF.md)**.
+
 ## PHASE 1 — Kaggle (coral models + fish segmentation: E1, E2, E3)
 
 Duration: ~2–3.5 h of GPU (single GPU). Quota cost: ~3 h of your 30.

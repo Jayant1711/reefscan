@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prepare-fishnet", action="store_true",
                         help="Only build the curated ImageFolder subset from the raw FishNet archive")
     parser.add_argument("--platform", default=None,
-                        choices=["kaggle", "colab", "lightning", "local"],
+                        choices=["kaggle", "colab", "lightning", "gpu", "local"],
                         help="Platform profile: aligns dataset paths with train.py --platform")
     parser.add_argument("--config", default=None)
     parser.add_argument("--set", nargs="*", default=[])

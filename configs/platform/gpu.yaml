@@ -1,0 +1,17 @@
+# GPU workstation profile — a colleague's dedicated NVIDIA-GPU machine running
+# the full E1–E6 experiment matrix locally (see HANDOFF.md at the repo root).
+#
+# Paths stay repo-relative (the clone is the workspace); the profile only tunes
+# I/O parallelism. Datasets download INSIDE the clone (datasets/) — the box has
+# no ephemeral-storage problem, unlike the cloud notebooks.
+#
+# If the card has ≥24 GB VRAM, batches can be raised with:
+#   --set coral.batch_size=128 --set fish.batch_size=128 --set seg.batch_size=32
+device:
+  num_workers: 8
+fish:
+  batch_size: 64
+coral:
+  batch_size: 64
+seg:
+  batch_size: 16

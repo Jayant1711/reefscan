@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--xai-task", default="fish", choices=["fish", "coral"],
                         help="Which trained classifier the XAI grid uses (default fish)")
     parser.add_argument("--platform", default=None,
-                        choices=["kaggle", "colab", "lightning", "local"],
+                        choices=["kaggle", "colab", "lightning", "gpu", "local"],
                         help="Platform profile: aligns dataset paths with train.py --platform")
     parser.add_argument("--config", default=None)
     parser.add_argument("--set", nargs="*", default=[])

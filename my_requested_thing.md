@@ -68,6 +68,7 @@ Run with `python train.py --task coral --model all --strategy feature_extraction
 | **Kaggle** (T4×2, 30 h/wk, phone-verified ✓) | primary | E1 coral FE screen → E2 coral FT → E3 seg |
 | **Colab** (T4, free tier) | secondary | E4 fish FE screen → E5 fish FT → E6 XAI/enhancement |
 | **Lightning AI** (T4, free credits) | backup | E7 re-run any failure; overflow fish fine-tune |
+| **GPU workstation** (colleague's PC, HANDOFF.md) | local NVIDIA GPU | can run the full E1–E6 matrix in one session — `--platform gpu` |
 
 Full runbook with copy-paste commands: [`PLATFORMS.md`](PLATFORMS.md).
 **Before closing any session:** `python scripts/export_artifacts.py` → download the zip (Kaggle Output panel / Colab `files.download` / Lightning file browser).

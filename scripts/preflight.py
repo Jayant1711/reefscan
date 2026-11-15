@@ -249,7 +249,7 @@ def run_preflight(platform: str | None, task: str, with_pytest: bool, config_pat
     report = {
         "schema": "reefscan-preflight-v1",
         "recorded_at": utc_now_iso(),
-        "platform": detect_platform(),
+        "platform": platform or detect_platform(),
         "git_sha": git_sha(ROOT),
         "versions": versions,
         "checks": [{"id": c.check_id, "status": c.status, "detail": c.detail} for c in checks],
@@ -260,7 +260,7 @@ def run_preflight(platform: str | None, task: str, with_pytest: bool, config_pat
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--platform", default=None, choices=["kaggle", "colab", "lightning", "local"])
+    parser.add_argument("--platform", default=None, choices=["kaggle", "colab", "lightning", "gpu", "local"])
     parser.add_argument("--task", default="all",
                         help="Which dataset checks to run: all | fish | coral | seg | comma list (e.g. coral,seg)")
     parser.add_argument("--with-pytest", action="store_true")

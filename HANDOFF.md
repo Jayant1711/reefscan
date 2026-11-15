@@ -1,0 +1,169 @@
+# HANDOFF — Local GPU Workstation Training
+
+**For:** the colleague running the ReefScan AI experiment matrix on a dedicated NVIDIA-GPU machine.
+**Repo:** https://github.com/Jayant1711/reefscan (branch `main`)
+**Your mission:** execute experiments **E1 → E6** from Table 4.3 of `my_requested_thing.md` on this one machine, then hand the results back.
+
+> **If you are an AI agent (Antigravity or similar) operating this repo:** execute the steps **in order**; after every step run the given ✅ verify command and only proceed when it passes. Never skip `preflight`. Never regenerate files under `notebooks/platform/` (they are generated and QA-approved). Use `--continue` on every training command so re-runs are idempotent. At the end, complete **Step 9 (hand-back)** — the project's final model selection is written from your manifests.
+
+Everything below was designed for exactly one command surface — no cloud paths, no Drive mounts, no notebook juggling. The whole matrix runs on one GPU in **~5–6 hours** (T4-class).
+
+---
+
+## TL;DR card
+
+| | |
+|---|---|
+| Machine | NVIDIA GPU ≥ 8 GB VRAM (16 GB = T4-class comfortable; 24 GB allows bigger batches), ≥ 30 GB free disk, CUDA 12.x-capable driver (≥ 525) |
+| OS | Linux or Windows (commands given for both where they differ) |
+| Python | 3.11 or 3.12 (CI validates both) |
+| Datasets | ~13.6 GB download (all three; one machine runs the whole matrix) |
+| Total GPU time | ~5–6 h (E1 35m · E2 50m · E3 30m · E4 1.5h · E5 1.5h · E6 15m) |
+| Platform flag | **`--platform gpu`** everywhere (profile: `configs/platform/gpu.yaml`) |
+| Hand-back | `runs/` manifests + `results/comparison/` + updated `my_requested_thing.md` — via artifact zip or a `results/local-gpu` branch push |
+
+---
+
+## Step 0 — Get the repo
+
+```bash
+git clone https://github.com/Jayant1711/reefscan.git
+cd reefscan
+```
+✅ Verify: `git log --oneline -1` prints the HEAD SHA the owner gave you (or later — the clone-or-update keeps you current).
+
+## Step 1 — Hardware & driver check
+
+```bash
+nvidia-smi
+```
+✅ Verify: a GPU is listed and the driver version is **≥ 525** (CUDA 12.x). If `nvidia-smi` is missing → install the NVIDIA driver for your card before anything else.
+
+## Step 2 — Python environment + the CUDA-torch gotcha
+
+Create an isolated env (Python 3.11 or 3.12):
+```bash
+python -m venv .venv
+# Linux:   source .venv/bin/activate
+# Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+```
+
+**⚠️ The #1 gotcha — the default `pip install torch` is CPU-only on Windows.** Install the CUDA build explicitly, WITH the repo's constraints so versions match the validated set:
+
+```bash
+# Linux (PyPI default already bundles CUDA — constraints still apply):
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 -c constraints.txt
+
+# Windows (must use the CUDA index):
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 -c constraints.txt
+```
+(If `cu124` is superseded on pytorch.org, use the latest `cu1xx` index it offers — the `-c constraints.txt` part is what must stay.)
+
+✅ Verify:
+```bash
+python -c "import torch; print(torch.__version__, '| CUDA:', torch.cuda.is_available())"
+```
+Must print `CUDA: True`. If False on Windows → you installed the CPU wheel; reinstall with the index above.
+
+## Step 3 — Project dependencies + full test suite
+
+```bash
+pip install -r requirements.txt -c constraints.txt
+python -m pytest tests/ -q
+```
+✅ Verify: **91 tests collected, all pass** (one may skip: ONNX parity needs `onnxruntime` — optional). If any test fails, STOP and report the traceback to the owner — do not patch the repo yourself.
+
+## Step 4 — Datasets (~13.6 GB, resumable, idempotent)
+
+```bash
+python download_data.py --dataset coral --platform gpu
+python download_data.py --dataset deepfish --platform gpu
+python download_data.py --dataset fishnet --platform gpu     # 5.7 GB images + 2.1 MB labels, then auto-crops
+```
+✅ Verify: `python scripts/preflight.py --platform gpu --task coral` shows `DS_CORAL PASS` (fish/seg will WARN/FAIL until their downloads finish — run preflight again after each download if you want per-dataset confirmation).
+
+Interrupted? Re-run the same command — archives resume (`curl -C -`), extraction and cropping are completion-marker guarded.
+
+## Step 5 — Clean the data (quarantine, nothing deleted)
+
+```bash
+python clean_data.py --dataset coral --apply --platform gpu
+python clean_data.py --dataset fishnet --apply --platform gpu
+python clean_data.py --dataset seg --apply --platform gpu
+```
+✅ Verify: reports at `results/cleaning/<name>_cleaning_report.json`; counts printed at the end.
+
+## Step 6 — Pre-flight gate
+
+```bash
+python scripts/preflight.py --platform gpu --task coral,seg,fish,fishnet --with-pytest
+```
+✅ Verify: **0 FAIL** (warnings OK). The command exits 1 on any FAIL — do not start training until it exits 0.
+
+## Step 7 — The experiment matrix (in order)
+
+| Step | Command | Verify after |
+|---|---|---|
+| **E1** coral FE screen (~35 m) | `python train.py --task coral --model all --strategy feature_extraction --platform gpu --continue` | `results/coral/model_leaderboard.csv` has 4 FE rows |
+| **E2** coral FT top-2 (~50 m) | `python train.py --task coral --model efficientnet_b0 --strategy finetune --platform gpu --continue` then same for `convnext_tiny`; optional `--strategy partial_finetune` on the E1 winner (skip on OOM) | 2 finetune manifests under `runs/coral/` |
+| **E3** segmentation (~30 m) | `python train.py --task seg --platform gpu --continue` then `python evaluate.py --task seg --platform gpu` | `results/seg/metrics.json` (IoU/Dice/pixel-AP/box-AP50) |
+| **E4** fish FE screen (~1.5 h) | `python train.py --task fish --model all --strategy feature_extraction --platform gpu --continue` | `results/fish/model_leaderboard.csv` has 4 FE rows |
+| **E5** fish FT winner (~1.5 h) | `python train.py --task fish --model <E4 winner> --strategy finetune --platform gpu --continue` | `runs/fish/<winner>_finetune/manifest.json` |
+| **E6** evaluation sweep (~15 m) | `python evaluate.py --task coral --platform gpu` · `--task fish --platform gpu` · `--enhancement --data datasets/fishnet/curated/train` | refreshed leaderboards + `results/enhancement/` |
+
+The E2/E5 winners are picked from the leaderboards (rank by `weighted_f1` among `strategy == feature_extraction` rows). OOM on a backbone? It is caught automatically and the sweep continues; for a manual re-run add `--set coral.batch_size=32` (or 16). `--continue` makes every re-run skip completed work.
+
+## Step 8 — Ledger + final comparison
+
+```bash
+python scripts/log_experiment.py      # auto-writes the Experiment log into my_requested_thing.md
+python scripts/compare_runs.py        # auto-writes Final selection + results/comparison/
+```
+✅ Verify: `my_requested_thing.md` §Experiment log has one row per run; `results/comparison/final_comparison.csv` exists.
+
+## Step 9 — Export and hand back
+
+```bash
+python scripts/export_artifacts.py    # -> reefscan_artifacts_<platform>_<sha8>_<date>.zip
+```
+Then hand back by EITHER:
+- **(preferred)** push a branch with the committable results:
+  ```bash
+  git checkout -b results/local-gpu
+  git add my_requested_thing.md results/comparison results/cleaning
+  git commit -m "results: local-GPU run (E1-E6)"
+  git push -u origin results/local-gpu
+  ```
+- **or** simply send `reefscan_artifacts_gpu_*.zip` back to the owner (contains models/, results/, runs/, reports/).
+
+---
+
+## VRAM → batch-size table
+
+| VRAM | coral/fish batch | seg batch | Notes |
+|---|---|---|---|
+| 8 GB (RTX 3060 Ti class) | 32 | 8 | `--set coral.batch_size=32 --set fish.batch_size=32 --set seg.batch_size=8` |
+| 16 GB (T4 / 4060 Ti / 4070) | 64 (profile default) | 16 | nothing to change |
+| 24 GB (3090/4090) | 128 | 32 | faster wall-clock; results unchanged |
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `CUDA: False` after Step 2 | Wrong wheel — reinstall torch with the `cu1xx` index (Step 2); check `nvidia-smi` driver ≥ 525 |
+| `CUDA out of memory` | Caught automatically per backbone on `--model all`; for a single run add `--set <task>.batch_size=32` (or 16) |
+| FishNet download stalls | Re-run the same command — `curl -C -` resumes; never delete the partial zip |
+| Preflight FAIL on DS_* | The matching dataset is missing/partial — re-run its `download_data.py` command (idempotent) |
+| `git pull` refuses on re-clone updates | Untracked artifacts are safe; run `git fetch origin && git reset --hard origin/main` (code only) |
+| pytest fails on the box | Copy the traceback and send it to the owner — do not patch the repo |
+| anything else | `results/reefscan.log` + the failing command's traceback → send both to the owner |
+
+## Rules for AI agents (Antigravity et al.)
+
+1. Execute steps **in order**; verify after each with the ✅ command before moving on.
+2. `--continue` on every `train.py` invocation; `--platform gpu` on every CLI call.
+3. Never edit source/config files to "fix" a failure — report it. The suite is QA-approved; failures are environment or genuine bugs the owner must see.
+4. Never regenerate `notebooks/platform/` or edit `configs/` — profiles are pinned by tests.
+5. Do not run `run_smoke_test.py` on the training box mid-matrix (it overwrites `models/demo/` and `results/`); it is a CI/laptop tool.
+6. Finish with **Step 9** even if some experiments failed — partial manifests are valuable and the owner's ledger handles gaps.

@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--apply", action="store_true",
                         help="Move flagged files to <dataset>/_quarantine/ (default: report only)")
     parser.add_argument("--platform", default=None,
-                        choices=["kaggle", "colab", "lightning", "local"],
+                        choices=["kaggle", "colab", "lightning", "gpu", "local"],
                         help="Platform profile: aligns dataset paths with train.py --platform")
     parser.add_argument("--config", default=None)
     parser.add_argument("--set", nargs="*", default=[])

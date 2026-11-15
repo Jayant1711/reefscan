@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
                         help=f"Backbone for fish/coral: {SUPPORTED_MODELS} or 'all'")
     parser.add_argument("--strategy", default=None, choices=list(STRATEGIES),
                         help="Transfer-learning strategy (default: config '%s.strategy')" % "task")
-    parser.add_argument("--platform", default=None, choices=["kaggle", "colab", "lightning", "local"],
+    parser.add_argument("--platform", default=None, choices=["kaggle", "colab", "lightning", "gpu", "local"],
                         help="Platform profile overlay from configs/platform/<name>.yaml")
     parser.add_argument("--config", default=None, help="Path to YAML config")
     parser.add_argument("--set", nargs="*", default=[], help="Config overrides: section.key=value")
@@ -95,6 +95,7 @@ def _write_manifest(cfg, task: str, model_name: str, strategy: str, train_second
         project_root=Path(__file__).resolve().parent,
         seed=cfg.project.get("seed", 42),
         dataset_summary=dataset_summary,
+        platform_override=getattr(args_like(), "platform", None),
     )
     manifest_dir = ensure_dir(Path(cfg.paths.results_dir).parent / "runs" / task / f"{model_name}_{strategy}")
     manifest_path = manifest_dir / "manifest.json"
@@ -269,7 +270,7 @@ def main() -> int:
     configure_threads(cfg.device.num_threads)
     device = resolve_device(cfg.device.prefer_gpu)
     logger.info("Platform=%s | device=%s | git=%s",
-                detect_platform(), gpu_name(device), git_sha())
+                args.platform or detect_platform(), gpu_name(device), git_sha())
 
     if args.task == "seg":
         if args.quick:

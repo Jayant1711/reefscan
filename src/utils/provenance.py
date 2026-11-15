@@ -95,13 +95,16 @@ def build_manifest(
     project_root: str | Path | None = None,
     seed: int | None = None,
     dataset_summary: dict | None = None,
+    platform_override: str | None = None,
 ) -> dict:
     """Assemble the canonical per-run manifest written to ``runs/<task>/...``."""
     return {
         "schema": "reefscan-run-manifest-v2",
         "recorded_at": utc_now_iso(),
         "git_sha": git_sha(project_root),
-        "platform": detect_platform(),
+        # Explicit --platform (e.g. a local GPU workstation) wins over env detection,
+        # so cross-platform ledger rows keep their true origin.
+        "platform": platform_override or detect_platform(),
         "gpu": gpu_name(),
         "env": env_versions(),
         "seed": seed,
