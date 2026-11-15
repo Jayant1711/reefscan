@@ -123,7 +123,7 @@ def prepare_fishnet_subset(
         )
     logger.info("Using labels CSV: %s", labels_csv)
     df = pd.read_csv(labels_csv)
-    required = {"img_id", "label_l1", "label_l2", "x_min", "x_max", "y_min", "y_max"}
+    required = {"img_id", "bbox_id", "label_l1", "label_l2", "x_min", "x_max", "y_min", "y_max"}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(

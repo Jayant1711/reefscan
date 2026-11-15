@@ -74,6 +74,25 @@ python -m pytest tests/ -q
 ```
 ✅ Verify: **91 tests collected, all pass** (one may skip: ONNX parity needs `onnxruntime` — optional). If any test fails, STOP and report the traceback to the owner — do not patch the repo yourself.
 
+## Step 3b — Verify the ONLINE dataset sources (metadata-only, ~1 min, before any download)
+
+The pipeline's assumptions about the upstream data are pinned in code. This step fetches only
+metadata (the 2.1 MB labels zip + HuggingFace APIs — no multi-GB downloads) and confirms the
+sources still match, so a silent upstream change is caught BEFORE 13.6 GB are pulled:
+
+```bash
+python scripts/verify_online_data.py
+```
+✅ Verify: all three checks PASS —
+- `FISHNET PASS` (columns img_id/bbox_id/x_min…/label_l1/label_l2; ~159k rows; ~35k frames; classes incl. Albacore, Yellowfin tuna)
+- `CORAL PASS` (splits 7,292/1,562/1,565; classes CORAL, CORAL_BL)
+- `DEEPFISH PASS` (DeepFish.tar present, ~7.1 GB)
+
+Any `SCHEMA DRIFT — FAIL` means the upstream release changed: **STOP**, do not download or train,
+and report the printed detail to the repo owner (the cleaning/training code must be updated to the
+new layout first). JSON report: `results/online_verify/online_verify_report.json`.
+After the downloads, cleaning reports (Step 5) re-verify the materialised copy locally.
+
 ## Step 4 — Datasets (~13.6 GB, resumable, idempotent)
 
 ```bash
@@ -139,6 +158,52 @@ Then hand back by EITHER:
 
 ---
 
+## Compute selection (Antigravity / agent rule)
+
+Preference order when more than one GPU is reachable — **train on the best available, keep the
+local PC's GPU free**:
+
+| Priority | Compute | What to run | Why |
+|---|---|---|---|
+| 1st | **Linked Colab GPU** (if the agent has a Colab connector) | `notebooks/platform/COLAB_training.ipynb` cell-by-cell (E4 → E5 → E6), or the CLI in the Colab terminal with `--platform colab` | Free T4; keeps the workstation free; the notebook's gates (pytest → crops assert → preflight) protect the run |
+| 2nd | **This workstation's NVIDIA GPU** | Steps 4–8 above with `--platform gpu` | Full matrix locally with `--continue` |
+| never | CPU-only machine | — | Training on CPU is not a supported mode |
+
+If training is executed on Colab while the workstation holds downloaded datasets, that is fine:
+`--continue` + the manifests mean the other platform skips completed work (E-matrix is split by
+platform in `my_requested_thing.md` §6 — E1–E3 coral/seg, E4–E5 fish).
+
+---
+
+## The first prompt to give Antigravity (copy-paste)
+
+```text
+You are operating the ReefScan AI repository (a final-year underwater computer-vision project).
+Open and read HANDOFF.md at the repo root — it is your complete runbook. Execute its steps in
+order, on this machine:
+
+1. Environment: Python 3.11+ venv, CUDA-enabled torch install (HANDOFF.md Step 2 — on Windows
+   the default pip wheel is CPU-only; use the cu1xx index with -c constraints.txt).
+2. Verify: pytest tests/ -q must pass (91 tests) before anything else.
+3. Dataset sources: run `python scripts/verify_online_data.py` FIRST. All three checks must PASS.
+   A "SCHEMA DRIFT — FAIL" means the upstream release changed: STOP and tell the user — do not
+   patch the code yourself.
+4. Download + clean + preflight: follow HANDOFF.md Steps 4-6 (datasets ~13.6 GB are resumable;
+   cleaning quarantines instead of deleting; preflight must exit 0 with --platform gpu).
+5. Train E1 -> E6 exactly as HANDOFF.md Step 7 says, with --continue on every train.py call and
+   --platform gpu. Verify each step's artefact before the next.
+6. Ledger: run scripts/log_experiment.py then scripts/compare_runs.py.
+7. Hand back: run scripts/export_artifacts.py and give me the zip path; then push the
+   results/local-gpu branch (ledger + results/comparison) as HANDOFF.md Step 9 says.
+
+Rules: never edit source/config files to fix a failure — report it to me; never skip preflight;
+never regenerate notebooks/platform/; prefer the linked Colab GPU for training if available and
+keep this PC's GPU load minimal; run scripts/verify_online_data.py again if a download fails
+mid-way (upstream may have drifted).
+```
+
+---
+
 ## VRAM → batch-size table
 
 | VRAM | coral/fish batch | seg batch | Notes |
@@ -167,3 +232,5 @@ Then hand back by EITHER:
 4. Never regenerate `notebooks/platform/` or edit `configs/` — profiles are pinned by tests.
 5. Do not run `run_smoke_test.py` on the training box mid-matrix (it overwrites `models/demo/` and `results/`); it is a CI/laptop tool.
 6. Finish with **Step 9** even if some experiments failed — partial manifests are valuable and the owner's ledger handles gaps.
+7. Run `scripts/verify_online_data.py` before the first download AND whenever a download fails mid-way — upstream schema drift must stop the run, not be patched around.
+8. Compute preference: linked Colab GPU > this workstation's GPU > (never) CPU-only training. Keep the workstation GPU load minimal when a Colab GPU is attached.

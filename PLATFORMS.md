@@ -33,6 +33,7 @@ GPU runtimes (enable BEFORE running any cell):
 ```bash
 # 0) setup (common first cell above)
 # 1) datasets -> /kaggle/tmp (ephemeral; the 20 GB Output carries only artefacts)
+python scripts/verify_online_data.py   # upstream schema drift alarm (metadata-only, ~1 min)
 !python download_data.py --dataset coral --platform kaggle
 !python download_data.py --dataset deepfish --platform kaggle
 # FishNet (E4/E5 run on Colab; skip here unless re-assigned):
