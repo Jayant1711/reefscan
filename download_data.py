@@ -70,7 +70,7 @@ def prepare_f4k(cfg) -> None:
         logger.info("Curated F4K subset -> %s", out)
     except FileNotFoundError as exc:
         logger.warning("F4K raw directory missing (%s).", exc)
-        logger.warning("Skipping F4K subset preparation. To train on fish, download the raw F4K archive into datasets/f4k/raw/. See docs/DATASETS.md")
+        logger.warning(f"Skipping F4K subset preparation — raw archive not found at {fish_raw}. Run `python download_data.py --dataset f4k` first.")
 
 
 def main() -> int:
@@ -80,7 +80,7 @@ def main() -> int:
     apply_platform(cfg, args.platform)
     override_from_args(cfg, args)
 
-    if args.prepare_f4k or args.prepare_fishnet:
+    if args.prepare_f4k:
         prepare_f4k(cfg)
         return 0
 
