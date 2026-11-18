@@ -126,13 +126,17 @@ class Trainer:
         else:
             self.model = build_model(model_name, num_classes).to(device)
 
+        # .to(device) is load-bearing: module buffers (e.g. OrdinalPenaltyLoss
+        # .positions) do NOT follow the model — without this they stay on CPU
+        # and the first GPU forward dies with a device mismatch. Invisible on
+        # CPU-only test boxes; caught live on the Kaggle T4 (2026-11-19).
         self.criterion = build_loss(
             num_classes,
             class_weight=class_weight.to(device) if class_weight is not None else None,
             label_smoothing=cfg.label_smoothing,
             ordinal=cfg.ordinal_loss,
             ordinal_lam=cfg.ordinal_lam,
-        )
+        ).to(device)
         if cfg.strategy == "partial_finetune":
             groups = partial_finetune_groups(self.model, model_name, cfg.lr)
         else:
