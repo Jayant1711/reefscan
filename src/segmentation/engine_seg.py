@@ -61,6 +61,15 @@ def _classify_member(path: Path) -> str:
 def discover_pairs(data_dir: str | Path) -> list[tuple[Path, Path]]:
     """Find (image, mask) pairs under a DeepFish extraction or any folder tree."""
     data_dir = Path(data_dir)
+    # The official DeepFish segmentation split lives under Segmentation/.
+    # The full tar also ships Localization/{images,masks}/{empty,valid} — 3,200
+    # extra pairs of which the fish-present ("valid") masks are unreliable
+    # (fish-class frames with all-black masks, verified from the tar on
+    # 2026-11-19). Pairing the whole tree trained E3 on 3,210 mixed pairs
+    # instead of the official 620, so scope to Segmentation/ when present.
+    seg_root = data_dir / "Segmentation"
+    if seg_root.is_dir():
+        data_dir = seg_root
     images_by_stem: dict[str, Path] = {}
     masks_by_stem: dict[str, Path] = {}
     for path in data_dir.rglob("*"):
