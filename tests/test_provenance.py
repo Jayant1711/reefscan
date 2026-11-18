@@ -51,7 +51,7 @@ def test_build_manifest_fields():
     assert manifest["train_seconds"] == 61.4 and manifest["epochs_ran"] == 3
     assert manifest["final_metrics"]["accuracy"] == 0.91234
     assert manifest["final_metrics"]["weird"] == [1, 2]      # non-scalar passed through
-    assert manifest["gpu"] in {"cpu", "unknown"} or "GPU" in manifest["gpu"]
+    assert isinstance(manifest["gpu"], str) and manifest["gpu"]  # "cpu", "unknown", or real GPU name
     for key in ("git_sha", "platform", "recorded_at"):
         assert manifest[key]
 

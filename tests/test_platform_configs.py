@@ -42,11 +42,13 @@ def test_gpu_profile_pins_throughput_keys():
     assert cfg.coral.batch_size == 64
     assert cfg.seg.batch_size == 16
     # GPU box keeps repo-relative paths (datasets download inside the clone).
-    # load_config absolutizes them against the repo root, so on Linux the value
-    # is <repo>/datasets — the platform-neutral assertion is "not a cloud root".
-    dr = str(cfg.paths.data_root)
-    assert not dr.startswith(("/kaggle", "/content")), f"gpu profile must keep datasets inside the clone, got {dr}"
-    assert dr.replace("\\", "/").endswith("/datasets"), f"unexpected data_root: {dr}"
+    # load_config absolutizes them against the repo root — on Kaggle the clone
+    # IS /kaggle/working/reefscan, so the anchored path legitimately starts
+    # with /kaggle. Platform-neutral invariant: it ends with /datasets and is
+    # NOT one of the ephemeral cloud data roots.
+    dr = str(cfg.paths.data_root).replace("\\", "/")
+    assert not dr.startswith("/kaggle/tmp") and not dr.startswith("/content/reefscan_data"),         f"gpu profile must not use cloud ephemeral data roots, got {dr}"
+    assert dr.endswith("/datasets"), f"unexpected data_root: {dr}"
 
 
 def test_cloud_profiles_pin_ephemeral_data_roots():

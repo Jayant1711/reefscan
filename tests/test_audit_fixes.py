@@ -92,7 +92,12 @@ def test_detect_platform_lightning_filesystem_fallback(monkeypatch):
     real_exists = _ospath.exists
 
     def fake_exists(path):
-        return str(path) == "/teamspace" or real_exists(path)
+        # Only the Lightning marker may "exist" — neutralize the Kaggle/Colab
+        # filesystem markers so this test passes ON those platforms too.
+        s = str(path)
+        if s in ("/teamspace", "/kaggle/working", "/content"):
+            return s == "/teamspace"
+        return real_exists(path)
 
     monkeypatch.setattr("os.path.exists", fake_exists)
     monkeypatch.delenv("KAGGLE_KERNEL_RUN_TYPE", raising=False)
