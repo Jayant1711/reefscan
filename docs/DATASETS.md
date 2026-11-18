@@ -39,8 +39,8 @@ textured mini-datasets that make every pipeline stage verifiable in minutes on C
 ## 5. Expected disk usage
 | Dataset | Size | Needed for |
 |---|---|---|
-| fishnet.ai raw | ~5.7 GB images + 2.1 MB labels | species classification |
-| fishnet.ai curated crops | ~1–2 GB | (crops kept after prepare) |
+| F4K raw | 487 MB tar + 0.6 MB class_id.csv | species classification |
+| F4K curated | ~0.9 GB | (species crops kept after prepare) |
 | DeepFish | ~7.1 GB | segmentation / boxes |
 | NOAA coral | ~770 MB | coral analysis |
 | Synthetic | ~20 MB | smoke test / demo |

@@ -1,5 +1,9 @@
 # HANDOFF — Local GPU Workstation Training
 
+> **STATUS: optional alternative lane.** The owner's decision (2026-11-18) is that ALL
+> training runs on **Kaggle** — see PLATFORMS.md and notebooks/platform/KAGGLE_training.ipynb.
+> This runbook remains valid if a local GPU workstation is ever used instead.
+
 **For:** the colleague running the ReefScan AI experiment matrix on a dedicated NVIDIA-GPU machine.
 **Repo:** https://github.com/Jayant1711/reefscan (branch `main`)
 **Your mission:** execute experiments **E1 → E6** from Table 4.3 of `my_requested_thing.md` on this one machine, then hand the results back.

@@ -66,14 +66,6 @@ r = subprocess.run([sys.executable, "-m", "pytest", "tests/", "-q"])
 assert r.returncode == 0, "TEST SUITE FAILED — fix before training (do not skip!)"
 """
 
-EXPORT_COLAB = """# --- 9. Save everything: ledger + artifact zip + BROWSER DOWNLOAD ----------
-!python scripts/log_experiment.py
-!python scripts/export_artifacts.py
-import glob
-from google.colab import files
-zip_path = sorted(glob.glob("reefscan_artifacts_colab_*.zip"))[-1]
-files.download(zip_path)   # saves the trained models to your PC
-"""
 
 EXPORT_KAGGLE = """# --- 12. Save everything: ledger + artifact zip -----------------------------
 !python scripts/log_experiment.py
@@ -192,151 +184,10 @@ else:
     ]
 
 
-def colab_cells() -> list[dict]:
-    setup = SETUP_COMMON.replace("REPO_DIR", "/content/reefscan")
-    return [
-        md("# ReefScan AI — Colab GPU training (E4 + E5 + E6)\n\n"
-           "Runs the **fish species** experiment matrix on Fish4Knowledge crops "
-           "(feature-extraction screen → fine-tune the winner) + XAI/enhancement benchmarks.\n\n"
-           "**Before Run All:** Runtime → *Change runtime type* → **T4 GPU**. Duration ≈ 2.5–3.5 h. "
-           "If *Allocating runtime* hangs, retry later — at the end the artifact zip downloads "
-           "straight to your PC."),
-        code(setup),
-        code(GPU_CHECK),
-        code("""# --- 2. Fish4Knowledge from the Edinburgh mirror (~487 MB) -> species crops ----
-!python download_data.py --dataset f4k --platform colab
-!python download_data.py --prepare-f4k --platform colab
-import glob
-n_crops = len(glob.glob("/content/reefscan_data/f4k/curated/*/*/*.png"))
-print("species crops materialized:", n_crops)
-assert n_crops > 1000, "too few crops - re-check the download and prepare cells above"
-"""),
-        code("""# --- 3. Data cleaning (corrupt/dup/leakage scan + quarantine) --------------
-!python clean_data.py --dataset f4k --apply --platform colab
-# --- 3b. Pre-flight validation: FAIL halts Run All before any GPU time ------
-import subprocess, sys
-r = subprocess.run([sys.executable, "scripts/preflight.py", "--platform", "colab", "--task", "fish"])
-assert r.returncode == 0, "PREFLIGHT FAILED — fix the FAIL rows above before training. "
-"""),
-        code("""# --- 4. E4 — fish feature-extraction screen (all 4 backbones, ~1.5 h) ------
-!python train.py --task fish --model all --strategy feature_extraction --platform colab
-import pandas as pd
-pd.read_csv("results/fish/model_leaderboard.csv")"""),
-        code("""# --- 5. E5 — auto-pick the winner and fine-tune it (~1.5 h) -----------------
-import pandas as pd, subprocess, sys
-lb = pd.read_csv("results/fish/model_leaderboard.csv")
-fe = lb[lb["strategy"] == "feature_extraction"]
-assert len(fe) >= 1, f"FE screen has no rows - E4 did not complete (only {len(lb)} rows total)"
-if len(fe) < 4:
-    print(f"WARNING: FE screen incomplete ({len(fe)}/4) - proceeding with available backbones")
-winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
-print("Fine-tuning FE-screen winner:", winner)
-r = subprocess.run([sys.executable, "train.py", "--task", "fish", "--model", winner,
-                    "--strategy", "finetune", "--platform", "colab"])
-if r.returncode != 0:
-    print(f"WARNING: fine-tune failed for {winner} - evaluation below uses the FE checkpoint")
-!python evaluate.py --task fish --platform colab
-pd.read_csv("results/fish/model_leaderboard.csv")"""),
-        code("""# --- 6. E6 — XAI grid + enhancement benchmark on real data ------------------
-import glob, shlex
-samples = (glob.glob("/content/reefscan_data/f4k/curated/test/*/*.png") or
-           glob.glob("/content/reefscan_data/f4k/curated/train/*/*.png"))
-!python evaluate.py --enhancement --data /content/reefscan_data/f4k/curated/train
-if samples:
-    !python evaluate.py --xai --image {shlex.quote(str(samples[0]))}
-else:
-    print("No curated fish images found — skipping XAI (not fatal).")"""),
-        code(EXPORT_COLAB),
-    ]
-
-
-def lightning_cells() -> list[dict]:
-    setup = SETUP_COMMON.replace("REPO_DIR", "reefscan")
-    return [
-        md("# ReefScan AI — Lightning AI backup run (E7)\n\n"
-           "Auto-detects which experiments are missing (from `runs/` manifests) and runs "
-           "**the next missing one**. Re-run this notebook until it prints `ALL EXPERIMENTS COMPLETE`.\n\n"
-           "**Before Run All:** Studio machine → **GPU (T4)**."),
-        code(setup),
-        code(GPU_CHECK),
-        code("""# --- 2. Auto-detect what is missing and run the next experiment ------------
-import subprocess, sys
-from pathlib import Path
-
-def done(task, model, strategy):
-    marker = Path("runs") / task / f"{model}_{strategy}" / "manifest.json"
-    return marker.exists()
-
-def run(cmd):
-    print(">>", " ".join(cmd))
-    subprocess.run([sys.executable, *cmd], check=True)
-
-def ensure_coral(dataset="coral"):
-    if not Path("/kaggle/tmp/reefscan_data/coral/imagefolders").exists() and \\
-       not Path("datasets/coral/imagefolders").exists():
-        run(["download_data.py", "--dataset", dataset])
-
-if not done("coral", "resnet34", "feature_extraction"):
-    ensure_coral()
-    run(["clean_data.py", "--dataset", "coral", "--apply"])
-    run(["train.py", "--task", "coral", "--model", "all", "--strategy", "feature_extraction", "--platform", "lightning"])
-    print(">>> E1 done. Re-run this notebook to continue with E2.")
-elif not any((Path("runs") / "coral" / d.name / "manifest.json").exists()
-             for d in Path("runs").glob("coral/*_finetune")):
-    import pandas as pd
-    lb = pd.read_csv("results/coral/model_leaderboard.csv")
-    fe = lb[lb["strategy"] == "feature_extraction"]
-    if fe.empty:
-        print(">>> No FE rows in the coral leaderboard - run E1 first.")
-    else:
-        top2 = fe.nlargest(2, "weighted_f1")["model"].tolist()
-        for model in top2:
-            if not done("coral", model, "finetune"):
-                run(["train.py", "--task", "coral", "--model", model, "--strategy", "finetune", "--platform", "lightning"])
-        print(">>> E2 done. Re-run this notebook to continue with E3.")
-elif not done("seg", "unet_small", "from_scratch"):
-    if not Path("datasets/deepfish/DeepFish").exists():
-        run(["download_data.py", "--dataset", "deepfish"])
-    run(["clean_data.py", "--dataset", "seg", "--apply"])
-    run(["train.py", "--task", "seg", "--platform", "lightning"])
-    run(["evaluate.py", "--task", "seg"])
-    print(">>> E3 done. Re-run this notebook to continue with fish (E4/E5).")
-elif not done("fish", "resnet34", "feature_extraction"):
-    if not Path("datasets/f4k/curated").exists() or not list(Path("datasets/f4k/curated").rglob("*.png")):
-        run(["download_data.py", "--dataset", "f4k"])
-        run(["download_data.py", "--prepare-f4k"])
-    run(["clean_data.py", "--dataset", "f4k", "--apply"])
-    run(["train.py", "--task", "fish", "--model", "all", "--strategy", "feature_extraction", "--platform", "lightning"])
-    print(">>> E4 done. Re-run this notebook to continue with E5.")
-elif not any((Path("runs") / "fish" / d.name / "manifest.json").exists()
-             for d in Path("runs").glob("fish/*_finetune")):
-    import pandas as pd
-    lb = pd.read_csv("results/fish/model_leaderboard.csv")
-    fe = lb[lb["strategy"] == "feature_extraction"]
-    if fe.empty:
-        print(">>> No FE rows in the fish leaderboard - run E4 first.")
-    else:
-        winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
-        if not done("fish", winner, "finetune"):
-            run(["train.py", "--task", "fish", "--model", winner, "--strategy", "finetune", "--platform", "lightning"])
-        run(["evaluate.py", "--task", "fish"])
-        print(">>> E5 done. Re-run this notebook to confirm ALL EXPERIMENTS COMPLETE.")
-else:
-    print("ALL EXPERIMENTS COMPLETE — run the export cell below.")"""),
-        code("""# --- 3. Save: ledger + artifact zip -----------------------------------------
-!python scripts/log_experiment.py
-!python scripts/export_artifacts.py
-import glob
-print("DOWNLOAD (Lightning file browser):", sorted(glob.glob("reefscan_artifacts_lightning_*.zip"))[-1])"""),
-    ]
-
-
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     targets = {
         "KAGGLE_training.ipynb": kaggle_cells(),
-        "COLAB_training.ipynb": colab_cells(),
-        "LIGHTNING_backup.ipynb": lightning_cells(),
     }
     for name, cells in targets.items():
         path = OUT / name

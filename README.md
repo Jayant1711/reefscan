@@ -68,11 +68,10 @@ python inference.py --mode video --input survey.mp4
 python inference.py --mode webcam
 ```
 
-Got your own NVIDIA GPU? Follow **[HANDOFF.md](HANDOFF.md)** — the full E1–E6 matrix on one machine in ~5–6 h.
-
-Cloud training: open the ready-to-run platform notebooks — `notebooks/platform/KAGGLE_training.ipynb`,
-`COLAB_training.ipynb`, `LIGHTNING_backup.ipynb` — they auto-clone, gate on the test suite,
-train the E-matrix, and zip artifacts for download. See `PLATFORMS.md` + `STEPS_TO_DO.md`.
+**All training runs on Kaggle** (30 free GPU-h/week): open `notebooks/platform/KAGGLE_training.ipynb` —
+it auto-clones, gates on the 102-test suite, downloads the data, trains every model
+(coral FE screen → FT top-2 → partial · fish FE → FT winner · segmentation), and zips all
+artefacts into the Output panel. ~5.5–7.5 h on a T4. See `PLATFORMS.md` + `STEPS_TO_DO.md`.
 
 ---
 

@@ -25,7 +25,7 @@ has run and you have downloaded the zip. Sessions die; your laptop does not.
 
 > **Alternative:** a dedicated NVIDIA-GPU PC can run the *entire* matrix locally — see **[HANDOFF.md](HANDOFF.md)**.
 
-## PHASE 1 — Kaggle (coral models + fish segmentation: E1, E2, E3)
+## PHASE 1 — Kaggle (FULL matrix: ALL models — E1–E6)
 
 Duration: ~2–3.5 h of GPU (single GPU). Quota cost: ~3 h of your 30.
 
@@ -34,7 +34,7 @@ Duration: ~2–3.5 h of GPU (single GPU). Quota cost: ~3 h of your 30.
 | 1.1 | Go to https://www.kaggle.com/code — **File → Import Notebook** (or New Notebook → File → Import) and upload `notebooks/platform/KAGGLE_training.ipynb` from this repo. Alternatively open your existing `notebook4d825dd1ea` and paste the notebook's cells in. |
 | 1.2 | Right sidebar → **Session options** → *Accelerator* → **GPU T4 ×2**; *Internet* → **On**. (Internet needs the phone verification from Phase 0.) |
 | 1.3 | Click **Run All** (top toolbar, ▶▶). The notebook: clones `github.com/Jayant1711/reefscan`, installs deps, runs the 102-test suite, downloads coral (~770 MB) + DeepFish (~7.1 GB) to `/kaggle/tmp`, cleans both, trains all 4 coral backbones with feature extraction (~35 min), **reads the leaderboard itself** and fine-tunes the top-2 (~50 min) + partial-finetunes the winner, trains the fish U-Net (~30 min), evaluates everything, and zips the artifacts. |
-| 1.4 | Watch it: cells stream progress bars. If a cell fails with `CUDA out of memory` → interrupt, run `!python train.py ... --set coral.batch_size=16` manually for the failing step. If the session dies with Kaggle's "known issue" banner → *Save Version → Save & Run All (Commit)* later, or continue on Lightning (Phase 3). |
+| 1.4 | Watch it: cells stream progress bars. If a cell fails with `CUDA out of memory` → interrupt, run `!python train.py ... --set coral.batch_size=16` manually for the failing step. If the session dies → *Save Version → Save & Run All (Commit)* later. |
 | 1.5 | When the last cell prints the zip name: right sidebar → **Output** panel → you will see `reefscan_artifacts_kaggle_<sha8>_<date>.zip` → click the ⋮ → **Download** (~100–300 MB). |
 | 1.6 | Save it on your PC at: `C:\reefscan_runs\artifacts\` (create this folder). Keep the zip — do not delete; it is your training record. |
 
@@ -43,33 +43,14 @@ Duration: ~2–3.5 h of GPU (single GPU). Quota cost: ~3 h of your 30.
 
 ---
 
-## PHASE 2 — Colab (fish species models: E4, E5, E6)
+## PHASE 2 — Kaggle continues: fish species (E4, E5, E6)
 
-Duration: ~5–6 h of GPU (fish crops are large). Best attempted 06:00–10:00 IST when free T4s are available. Expect `--set fish.batch_size=32` if ConvNeXt FT runs out of memory.
+The FULL-matrix notebook already includes the fish lane (F4K download → crops →
+clean → FE ×4 → FT winner → eval + XAI). If you imported the older coral-only
+notebook, re-import the current `notebooks/platform/KAGGLE_training.ipynb` —
+the clone-or-update cell + `--continue` manifests skip everything already done.
 
-| Step | Action |
-|---|---|
-| 2.1 | Go to https://colab.research.google.com → **File → Upload notebook** → pick `notebooks/platform/COLAB_training.ipynb`. |
-| 2.2 | **Runtime → Change runtime type → T4 GPU → Save.** |
-| 2.3 | **Runtime → Run all.** The notebook: clones the repo, installs deps, runs the test suite, downloads Fish4Knowledge from the official Edinburgh mirror (~487 MB tar), extracts the 27,370 verified species crops (23 clusters; ~13 classes with ≥100 images kept after curation),, cleans them, trains all 4 backbones with feature extraction (~1.5 h), **auto-picks the winner** from the leaderboard and fine-tunes it (~1.5 h), runs XAI + enhancement benchmarks. |
-| 2.4 | If the first cell hangs at *Allocating runtime* for >10 min: Runtime → **Disconnect and delete runtime**, then reconnect (free-tier capacity issue, not your fault). Off-peak hours almost always connect instantly. |
-| 2.5 | The final cell runs `files.download(...)` — your **browser saves `reefscan_artifacts_colab_<sha8>_<date>.zip` to `C:\Users\lenovo\Downloads\`**. Move it to `C:\reefscan_runs\artifacts\`. |
-| 2.6 | If the browser download is interrupted before the session dies: re-run only the last cell (it re-creates the zip). If the session already died — re-run the notebook; nothing needs re-typing. |
-
----
-
-## PHASE 3 — Lightning AI (backup / whatever is missing: E7)
-
-Duration: only the missing experiments. Free monthly credits (~15 T4 hours).
-
-| Step | Action |
-|---|---|
-| 3.1 | https://lightning.ai → Log in with Google → **New Studio** (default CPU is fine to start). |
-| 3.2 | Inside the studio open a **Terminal** and run: `git clone https://github.com/Jayant1711/reefscan.git && cd reefscan && pip install -q -r requirements.txt` |
-| 3.3 | Switch to GPU: top-right machine selector → **Switch machine → GPU (T4)** (restarts the studio). |
-| 3.4 | Upload the artifact zips you already downloaded (file browser → Upload button) and unzip them here so Lightning sees what is already done: `unzip ../reefscan_artifacts_*.zip -d .` — this restores `runs/` and `results/`, so the backup notebook knows what to skip. |
-| 3.5 | Open `notebooks/platform/LIGHTNING_backup.ipynb` (Upload notebook) → **Run All**. It **auto-detects which experiments are missing** from `runs/` manifests and runs exactly one phase (E1 → E2 → E3 → E4 → E5). Re-run it until it prints `ALL EXPERIMENTS COMPLETE`. |
-| 3.6 | The last cell prints the zip path → in the **file browser**, right-click `reefscan_artifacts_lightning_*.zip` → **Download** → save to `C:\reefscan_runs\artifacts\`. |
+**Total Kaggle quota for the entire project: ~6 h of the 30 h/week.**
 
 ---
 
