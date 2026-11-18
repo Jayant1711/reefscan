@@ -120,7 +120,7 @@ python scripts/preflight.py --platform gpu --task coral,seg,fish --with-pytest
 ```
 ✅ Verify: **0 FAIL** (warnings OK). The command exits 1 on any FAIL — do not start training until it exits 0.
 
-## Step 7 — The experiment matrix (in order)
+## Step 7 — The experiment matrix (in order; ONE GPU box runs E1–E6 sequentially)
 
 | Step | Command | Verify after |
 |---|---|---|

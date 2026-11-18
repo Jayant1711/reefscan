@@ -36,12 +36,13 @@ GPU runtimes (enable BEFORE running any cell):
 python scripts/verify_online_data.py   # upstream schema drift alarm (metadata-only, ~1 min)
 !python download_data.py --dataset coral --platform kaggle
 !python download_data.py --dataset deepfish --platform kaggle
+!python download_data.py --dataset f4k --platform kaggle          # Fish4Knowledge ~487 MB
 # F4K (E4/E5 run on Colab; skip here unless re-assigned):
 # !python download_data.py --dataset f4k
 
 # 2) clean (report -> quarantine flagged files)
 !python clean_data.py --dataset coral --apply --platform kaggle
-!python clean_data.py --dataset seg --apply --platform kaggle
+!python clean_data.py --dataset f4k --apply --platform kaggle
 
 # 3) E1 — coral FE screen (all 4 backbones, frozen backbone, ~35 min on a T4)
 !python train.py --task coral --model all --strategy feature_extraction --platform kaggle
@@ -53,6 +54,12 @@ python scripts/verify_online_data.py   # upstream schema drift alarm (metadata-o
 # 5) E3 — fish segmentation U-Net (~30 min)
 !python train.py --task seg --platform kaggle
 !python evaluate.py --task seg --platform kaggle   # IoU / Dice / pixel-AP / box-AP50
+
+# 5b) E4/E5 — fish species on F4K crops (also trainable here) ------------
+# !python download_data.py --dataset f4k --platform kaggle
+# !python clean_data.py --dataset f4k --apply --platform kaggle
+# !python train.py --task fish --model all --strategy feature_extraction --platform kaggle
+# !python train.py --task fish --model <winner> --strategy finetune --platform kaggle
 
 # 6) SAVE — zip + record (before session ends!)
 !python evaluate.py --task coral --platform kaggle

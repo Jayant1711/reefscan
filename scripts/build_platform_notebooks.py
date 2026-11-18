@@ -75,7 +75,7 @@ zip_path = sorted(glob.glob("reefscan_artifacts_colab_*.zip"))[-1]
 files.download(zip_path)   # saves the trained models to your PC
 """
 
-EXPORT_KAGGLE = """# --- 9. Save everything: ledger + artifact zip ------------------------------
+EXPORT_KAGGLE = """# --- 12. Save everything: ledger + artifact zip -----------------------------
 !python scripts/log_experiment.py
 !python scripts/export_artifacts.py
 import glob, os, shutil
@@ -92,12 +92,14 @@ print("  Everything under /kaggle/working persists as notebook output.")
 def kaggle_cells() -> list[dict]:
     setup = SETUP_COMMON.replace("REPO_DIR", "/kaggle/working/reefscan")
     return [
-        md("# ReefScan AI — Kaggle GPU training (E1 + E2 + E3)\n\n"
-           "Runs the **coral bleaching** experiment matrix (feature-extraction screen → "
-           "fine-tune the top-2) plus **fish segmentation**, fully automatically.\n\n"
+        md("# ReefScan AI — Kaggle GPU training (FULL matrix: E1–E6, all models)\n\n"
+           "Runs **every model** in one session: coral bleaching (feature-extraction screen → "
+           "fine-tune top-2 → partial), fish segmentation, AND fish species classification "
+           "(Fish4Knowledge crops).\n\n"
            "**Before Run All:** right sidebar → *Session options* → **Accelerator: GPU T4 x2** "
-           "and **Internet: On**. Duration ≈ 1.5–2.5 h on a T4. "
-           "At the end the artifact zip appears in the **Output panel** — download it."),
+           "and **Internet: On**. Duration ≈ 5.5–7.5 h on a T4 (fits the 12 h session; "
+           "30 h/week quota). At the end the artifact zip with ALL trained models appears in "
+           "the **Output panel** — download it."),
         code(setup),
         code(GPU_CHECK),
         code("""# --- 2. Datasets (~8 GB to ephemeral /kaggle/tmp) ---------------------------
@@ -151,6 +153,41 @@ if sample:
     !python evaluate.py --xai --xai-task coral --image {shlex.quote(str(sample[0]))}
 else:
     print("No coral test images found — skipping XAI (not fatal).")"""),
+        code("""# --- 8. E4 — fish species data (F4K) + cleaning + preflight -----------------
+!python download_data.py --dataset f4k --platform kaggle      # ~487 MB tar -> 27,370 crops
+!python download_data.py --prepare-f4k --platform kaggle      # curated species ImageFolder
+!python clean_data.py --dataset f4k --apply --platform kaggle
+import subprocess, sys, glob
+r = subprocess.run([sys.executable, "scripts/preflight.py", "--platform", "kaggle", "--task", "fish"])
+assert r.returncode == 0, "PREFLIGHT FAILED for fish - fix the FAIL rows above before training."
+print("F4K species crops:", len(glob.glob("/kaggle/tmp/reefscan_data/f4k/curated/*/*/*.png")))"""),
+        code("""# --- 9. E4 — fish feature-extraction screen (all 4 backbones, ~1.5-2.5 h) ----
+!python train.py --task fish --model all --strategy feature_extraction --platform kaggle
+import pandas as pd
+pd.read_csv("results/fish/model_leaderboard.csv")"""),
+        code("""# --- 10. E5 — auto-pick the fish FE-screen winner and fine-tune (~1.5-2.5 h) --
+import pandas as pd, subprocess, sys
+lb = pd.read_csv("results/fish/model_leaderboard.csv")
+fe = lb[lb["strategy"] == "feature_extraction"]
+assert len(fe) >= 1, f"FE screen has no rows - E4 did not complete (only {len(lb)} rows total)"
+if len(fe) < 4:
+    print(f"WARNING: FE screen incomplete ({len(fe)}/4) - proceeding with available backbones")
+winner = fe.nlargest(1, "weighted_f1")["model"].iloc[0]
+print("Fine-tuning FE-screen winner:", winner)
+r = subprocess.run([sys.executable, "train.py", "--task", "fish", "--model", winner,
+                    "--strategy", "finetune", "--platform", "kaggle"])
+if r.returncode != 0:
+    print(f"WARNING: fine-tune failed for {winner} - evaluation below uses the FE checkpoint")
+!python evaluate.py --task fish --platform kaggle
+pd.read_csv("results/fish/model_leaderboard.csv")"""),
+        code("""# --- 11. E6 — XAI sanity check on the best fish model -----------------------
+import glob, shlex
+sample = (glob.glob("/kaggle/tmp/reefscan_data/f4k/curated/test/*/*.png") or
+          glob.glob("datasets/f4k/curated/test/*/*.png"))
+if sample:
+    !python evaluate.py --xai --xai-task fish --image {shlex.quote(str(sample[0]))}
+else:
+    print("No F4K test crops found — skipping XAI (not fatal).")"""),
         code(EXPORT_KAGGLE),
     ]
 
