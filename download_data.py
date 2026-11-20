@@ -57,7 +57,7 @@ def apply_platform(cfg, platform: str | None):
         logger.warning("No platform profile at %s — using defaults.", overlay)
     return cfg
 
-def prepare_f4k(cfg) -> None:
+def prepare_f4k(cfg, args=None) -> None:
     from src.data.prepare_f4k import prepare_f4k_subset
 
     section = cfg.fish.prepare
@@ -85,7 +85,7 @@ def main() -> int:
     override_from_args(cfg, args)
 
     if args.prepare_f4k:
-        prepare_f4k(cfg)
+        prepare_f4k(cfg, args)
         return 0
 
     root = Path(cfg.paths.data_root)
@@ -110,7 +110,7 @@ def main() -> int:
         fish_raw.mkdir(parents=True, exist_ok=True)
         path = download_f4k(fish_raw)
         logger.info("✅ F4K ready -> %s", path)
-        prepare_f4k(cfg)
+        prepare_f4k(cfg, args)
 
     logger.info("All requested datasets ready. Next: python train.py --task fish --model resnet34")
     return 0
