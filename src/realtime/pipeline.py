@@ -208,13 +208,19 @@ class ReefScanPipeline:
         t0 = time.perf_counter()
         boxes: list[BBox]
         if self.segmenter is not None:
-            prob_mask = self.segmenter.predict_mask(cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB))
+            # Feed the segmenter the RAW frame, not the enhanced one: the U-Net
+            # was trained on raw DeepFish frames, and enhancement (e.g. color
+            # restoration) shifts intensities enough to saturate the sigmoid —
+            # a 100%-foreground mask yields a whole-frame box and scene-level
+            # species probabilities (live-caught 2026-11-20). Raw input hits
+            # 191/310 valid frames vs 150 enhanced, with confident peaks.
+            prob_mask = self.segmenter.predict_mask(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
             boxes = masks_to_boxes(
                 prob_mask,
                 threshold=self.cfg.seg.threshold,
                 min_area=self.cfg.seg.min_box_area,
                 max_boxes=self.cfg.seg.max_boxes,
-                original_size=enhanced.shape[:2],
+                original_size=image_bgr.shape[:2],
             )
         else:
             boxes = []
