@@ -89,6 +89,12 @@ def prepare_f4k_subset(
         # --force-f4k-prepare) to rebuild.
         logger.info("Curated F4K subset already complete at %s — skipping.", out_dir)
         return out_dir
+    if force and out_dir.exists():
+        # A rebuild must start clean: copying a capped set over a stale
+        # uncapped one leaves a 28K-file hybrid (old head classes still on
+        # disk) whose re-split files also register as cross-split leaks.
+        shutil.rmtree(out_dir)
+        logger.info("Force rebuild: purged stale %s", out_dir)
 
     fish_root = raw_dir / "fishRecognition_GT" / "fish_image"
     if not fish_root.is_dir():

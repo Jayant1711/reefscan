@@ -51,13 +51,18 @@ def test_force_rebuilds_past_complete_marker(tmp_path: Path) -> None:
     prepare_f4k_subset(raw, out, min_images_per_class=100, top_k=1,
                        max_images_per_class=1000)
     (out / "_COMPLETE").write_text("stale\n", encoding="utf-8")
-    # Without force: skip. With force: rebuild (marker rewritten).
+    # A stale file from a previous (uncapped) build must NOT survive a forced
+    # rebuild — copying over it produced a 28K-file hybrid on the live run.
+    stale = out / "train" / "fish_01" / "stale_leftover.png"
+    stale.write_bytes(b"png")
+    # Without force: skip. With force: purge + rebuild (marker rewritten).
     p1 = prepare_f4k_subset(raw, out, min_images_per_class=100, top_k=1,
                             max_images_per_class=1000)
-    assert p1.exists()
+    assert p1.exists() and stale.exists(), "skip path must not purge"
     p2 = prepare_f4k_subset(raw, out, min_images_per_class=100, top_k=1,
                             max_images_per_class=1000, force=True)
     assert (p2 / "_COMPLETE").exists()
+    assert not stale.exists(), "force rebuild must purge stale output"
 
 
 def test_uncapped_class_below_cap_untouched(tmp_path: Path) -> None:
