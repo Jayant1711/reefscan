@@ -70,6 +70,7 @@ fish:
     # labels carried by the tar directory structure (verified vs class_id.csv)
     top_k: 13                # clusters with >= 100 images
     min_images_per_class: 100
+    max_images_per_class: 1000   # cap head classes: raw imbalance 84x fails the preflight gate
     split_fractions: [0.8, 0.1, 0.1]   # seeded VIDEO-GROUP split (crops of one video share a split)
   image_size: 224
   batch_size: 32

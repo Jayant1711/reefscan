@@ -30,6 +30,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", choices=["all", "f4k", "deepfish", "coral"], default="all")
     parser.add_argument("--prepare-f4k", "--prepare-fishnet", dest="prepare_f4k", action="store_true",
                         help="Only build the curated species ImageFolder from the raw F4K archive")
+    parser.add_argument("--force-f4k-prepare", dest="force_f4k_prepare", action="store_true",
+                        help="Rebuild the curated F4K ImageFolder even if _COMPLETE exists")
     parser.add_argument("--platform", default=None,
                         choices=["kaggle", "colab", "lightning", "gpu", "local"],
                         help="Platform profile: aligns dataset paths with train.py --platform")
@@ -66,6 +68,8 @@ def prepare_f4k(cfg) -> None:
             min_images_per_class=int(section.get("min_images_per_class", 100)),
             top_k=int(section.get("top_k", 13)),
             split_fractions=tuple(section.get("split_fractions", [0.8, 0.1, 0.1])),
+            max_images_per_class=int(section.get("max_images_per_class", 1000)),
+            force=bool(getattr(args, "force_f4k_prepare", False)),
         )
         logger.info("Curated F4K subset -> %s", out)
     except FileNotFoundError as exc:

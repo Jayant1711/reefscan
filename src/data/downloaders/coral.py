@@ -42,14 +42,17 @@ def _imagefolder_ready(root: Path, min_images: int = 100) -> bool:
     # created before markers existed are healed in place.
     if not root.exists():
         return False
-    total = sum(1 for _ in root.rglob("*.jpg")) + sum(1 for _ in root.rglob("*.png"))
+    # Match extensions case-insensitively: the NOAA repo ships .PNG (upper) —
+    # rglob("*.png") matches on Windows but NOT on Linux (Kaggle), which made
+    # the ready-check report an empty split set and raise a false "incomplete".
+    total = sum(1 for f in root.rglob("*") if f.suffix.lower() in IMG_EXTS)
     if total < min_images:
         return False
     # Healing a pre-marker dataset requires ALL splits populated - an
     # interrupted write that reached min_images total must NOT self-heal.
     splits = {
         d.name for d in root.iterdir() if d.is_dir()
-        and (any(d.rglob("*.jpg")) or any(d.rglob("*.png")))
+        and any(f.suffix.lower() in IMG_EXTS for f in d.rglob("*"))
     }
     if not {"train", "test"} <= splits or not (splits & {"validation", "val"}):
         return False
@@ -65,7 +68,10 @@ def _materialise_imagefolder(snapshot_dir: Path, root: Path) -> dict[str, int]:
     """
     import shutil
 
-    rename = {"train": "train", "val": "validation", "test": "test"}
+    # The repo layout has used both "val" and "validation" for the middle
+    # split (verified live 2026-11-20) — accept either.
+    src_val_name = "validation" if (snapshot_dir / "validation").is_dir() else "val"
+    rename = {"train": "train", src_val_name: "validation", "test": "test"}
     counts: dict[str, int] = {}
     for src_split, dst_split in rename.items():
         for cls in CLASS_NAMES:
@@ -127,6 +133,6 @@ def download_coral(data_dir: str | Path, force: bool = False) -> Path:
         )
 
     (root.parent / "_COMPLETE").write_text("ok\n", encoding="utf-8")
-    n = sum(1 for _ in root.rglob("*.jpg")) + sum(1 for _ in root.rglob("*.png"))
+    n = sum(1 for f in root.rglob("*") if f.suffix.lower() in IMG_EXTS)
     logger.info("Coral dataset ready: %d images under %s", n, root)
     return root

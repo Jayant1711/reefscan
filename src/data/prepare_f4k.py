@@ -20,6 +20,10 @@ Curated output:
   one video are near-duplicates, so this prevents scene-level leakage.
 * Classes with fewer than ``min_images_per_class`` images are dropped
   (13 of 23 clusters have >= 100 images; 26,903 images total at the default).
+* Head classes are capped at ``max_images_per_class`` images (whole
+  video-segment groups, deterministic) — the raw long tail is 84x
+  (largest ~9.6K vs smallest 114), which fails the preflight imbalance
+  gate and starves head epochs even under the balanced sampler.
 """
 
 from __future__ import annotations
@@ -73,13 +77,16 @@ def prepare_f4k_subset(
     split_fractions: tuple[float, float, float] = DEFAULT_SPLIT,
     seed: int = 42,
     copy_images: bool = True,  # unused; kept for CLI compatibility
+    max_images_per_class: int = 1000,
+    force: bool = False,
 ) -> Path:
     """Build the curated F4K species ImageFolder. Returns ``out_dir``."""
     raw_dir, out_dir = Path(raw_dir), Path(out_dir)
     done_marker = out_dir / "_COMPLETE"
-    if done_marker.exists():
+    if done_marker.exists() and not force:
         # NOTE: the marker records completion, not the config that produced it —
-        # after changing prepare knobs, delete the marker to rebuild.
+        # after changing prepare knobs, delete the marker (or pass force=True /
+        # --force-f4k-prepare) to rebuild.
         logger.info("Curated F4K subset already complete at %s — skipping.", out_dir)
         return out_dir
 
@@ -120,6 +127,34 @@ def prepare_f4k_subset(
                 items.append((cls, src, _video_group(src)))
     if not items:
         raise ValueError(f"No images found for the kept classes under {fish_root}")
+
+    # Cap head classes to soften the long-tail imbalance (F4K: largest ~9.6K
+    # vs smallest 114 → 84x, which fails the preflight gate and starves head
+    # epochs even under the balanced sampler). Whole video-segment groups are
+    # dropped in deterministic name order until the class is at/below the cap,
+    # preserving both the no-leakage property and every tail-class image.
+    if max_images_per_class and max_images_per_class > 0:
+        by_class: dict[str, dict[str, list[tuple[str, Path, str]]]] = defaultdict(
+            lambda: defaultdict(list))
+        for it in items:
+            by_class[it[0]][it[2]].append(it)
+        capped: list[tuple[str, Path, str]] = []
+        for cls in sorted(by_class):
+            groups = by_class[cls]
+            total = sum(len(v) for v in groups.values())
+            if total <= max_images_per_class:
+                for g in sorted(groups):
+                    capped.extend(groups[g])
+                continue
+            kept = 0
+            for g in sorted(groups):
+                if kept >= max_images_per_class:
+                    break
+                capped.extend(groups[g])
+                kept += len(groups[g])
+            logger.info("Class %s capped: %d -> %d (dropped whole video groups, "
+                        "deterministic).", cls, total, kept)
+        items = capped
 
     groups = sorted({g for _, _, g in items})
     assignment = _grouped_split(groups, split_fractions, seed=seed)
