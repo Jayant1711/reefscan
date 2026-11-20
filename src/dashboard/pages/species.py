@@ -58,10 +58,19 @@ def page_species(cfg) -> None:
                            use_container_width=True)
     with right:
         if analysis.detections:
-            st.markdown("### Detections")
+            if analysis.scene_fallback:
+                st.warning(
+                    "🔍 **No fish detected** by the segmentation model in this frame — "
+                    "the species list below is a scene-level guess over the whole image, "
+                    "not a detection. (The small U-Net is trained on 262 DeepFish pairs "
+                    "and misses some frames; try a reef frame with clearly visible fish.)",
+                    icon="⚠️",
+                )
+            st.markdown("### Detections" if not analysis.scene_fallback else "### Scene-level guess")
             for det in analysis.detections:
+                label = det.species if not analysis.scene_fallback else f"{det.species} (scene guess)"
                 st.markdown(
-                    f"**{det.species}** — {det.confidence:.1%} · box ({det.x1},{det.y1},{det.x2},{det.y2})"
+                    f"**{label}** — {det.confidence:.1%} · box ({det.x1},{det.y1},{det.x2},{det.y2})"
                     + (f" · track #{det.track_id}" if det.track_id is not None else "")
                 )
             best = max(analysis.detections, key=lambda d: d.confidence)

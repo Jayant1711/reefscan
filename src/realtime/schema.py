@@ -54,6 +54,9 @@ class FrameAnalysis:
     heatmap: np.ndarray | None = None
     timings: dict[str, float] = field(default_factory=dict)
     species_probs: dict[str, float] | None = None  # top-k of the best box (or frame)
+    scene_fallback: bool = False  # True when the segmenter found no fish and the
+    # whole frame was analysed as one region — the species list is then a
+    # scene-level guess, not a detection, and the UI must say so.
     annotated: np.ndarray | None = None            # filled by analyze_file
     heatmap_path: str | None = None                # filled by analyze_file
 

@@ -1,0 +1,15 @@
+{
+  "model_name": "efficientnet_b0",
+  "epoch": 9,
+  "metric_for_best": "weighted_f1",
+  "value": 0.8934664374877821,
+  "class_names": [
+    "CORAL",
+    "CORAL_BL"
+  ],
+  "strategy": "finetune",
+  "params": {
+    "params_total": 4010110,
+    "params_trainable": 4010110
+  }
+}

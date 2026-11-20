@@ -224,9 +224,12 @@ class ReefScanPipeline:
             )
         else:
             boxes = []
+        scene_fallback = False
         if not boxes:
             # No segmenter / nothing found: analyse the whole frame as one region
-            # so species classification always produces a usable result.
+            # so species classification always produces a usable result. Flagged
+            # so the UI can present it as a scene-level guess, not a detection.
+            scene_fallback = True
             h, w = enhanced.shape[:2]
             boxes = [BBox(0, 0, w, h, 1.0, h * w)]
 
@@ -267,6 +270,7 @@ class ReefScanPipeline:
         return FrameAnalysis(
             detections=detections, coral=coral_result, enhanced=enhanced,
             heatmap=heatmap, timings=timings, species_probs=species_probs,
+            scene_fallback=scene_fallback,
         )
 
     def analyze_file(self, image_path: str | Path, out_dir: str | Path | None = None,

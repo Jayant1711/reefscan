@@ -1,0 +1,34 @@
+{
+  "root": "/kaggle/tmp/reefscan_data/coral/imagefolders",
+  "scanned": 10419,
+  "per_split": {
+    "test": {
+      "scanned": 1565,
+      "corrupt": 0,
+      "too_small": 0
+    },
+    "train": {
+      "scanned": 7292,
+      "corrupt": 0,
+      "too_small": 0
+    },
+    "validation": {
+      "scanned": 1562,
+      "corrupt": 0,
+      "too_small": 0
+    }
+  },
+  "corrupt": [],
+  "too_small": [],
+  "duplicate_groups": [],
+  "leakage_groups": [],
+  "counts": {
+    "scanned": 10419,
+    "corrupt": 0,
+    "too_small": 0,
+    "duplicate_images": 0,
+    "leaked_images": 0,
+    "quarantined": 0
+  },
+  "quarantined": []
+}

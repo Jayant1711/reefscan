@@ -1,0 +1,71 @@
+{
+  "task": "coral",
+  "best_model": "efficientnet_b0",
+  "metric_for_best": "weighted_f1",
+  "leaderboard": [
+    {
+      "model": "efficientnet_b0",
+      "strategy": "finetune",
+      "params_m": 4.01,
+      "params_trainable_m": 4.01,
+      "train_seconds": 365.14867067337036,
+      "accuracy": 0.8984025559105431,
+      "top5_accuracy": 1.0,
+      "macro_ap": 0.9458198186137188,
+      "precision_macro": 0.891139896373057,
+      "recall_macro": 0.8934270734529233,
+      "macro_f1": 0.8922488545473205,
+      "weighted_f1": 0.8985506396331876,
+      "throughput_fps": 487.06616965308166,
+      "n_test": 1565
+    },
+    {
+      "model": "mobilenet_v3",
+      "strategy": "partial_finetune",
+      "params_m": 1.52,
+      "params_trainable_m": 1.11,
+      "train_seconds": 315.02032113075256,
+      "accuracy": 0.888817891373802,
+      "top5_accuracy": 1.0,
+      "macro_ap": 0.9411005006526668,
+      "precision_macro": 0.8822867608581895,
+      "recall_macro": 0.8807367181229739,
+      "macro_f1": 0.8814963549391097,
+      "weighted_f1": 0.8887049627912615,
+      "throughput_fps": 533.9358628161923,
+      "n_test": 1565
+    },
+    {
+      "model": "convnext_tiny",
+      "strategy": "feature_extraction",
+      "params_m": 27.82,
+      "params_trainable_m": 0.0,
+      "train_seconds": 246.57276725769043,
+      "accuracy": 0.873482428115016,
+      "top5_accuracy": 1.0,
+      "macro_ap": 0.9214733234025065,
+      "precision_macro": 0.8641562616873737,
+      "recall_macro": 0.8687490662469555,
+      "macro_f1": 0.8662887234968,
+      "weighted_f1": 0.8738787754769012,
+      "throughput_fps": 172.57972475376312,
+      "n_test": 1565
+    },
+    {
+      "model": "resnet34",
+      "strategy": "feature_extraction",
+      "params_m": 21.29,
+      "params_trainable_m": 0.0,
+      "train_seconds": 350.0781457424164,
+      "accuracy": 0.8159744408945687,
+      "top5_accuracy": 1.0,
+      "macro_ap": 0.8747665047980333,
+      "precision_macro": 0.81042071197411,
+      "recall_macro": 0.7916089042690321,
+      "macro_f1": 0.79865483993167,
+      "weighted_f1": 0.8131067074018012,
+      "throughput_fps": 424.08145725839853,
+      "n_test": 1565
+    }
+  ]
+}

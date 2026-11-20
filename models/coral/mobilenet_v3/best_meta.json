@@ -1,0 +1,15 @@
+{
+  "model_name": "mobilenet_v3",
+  "epoch": 5,
+  "metric_for_best": "weighted_f1",
+  "value": 0.8879944500887746,
+  "class_names": [
+    "CORAL",
+    "CORAL_BL"
+  ],
+  "strategy": "partial_finetune",
+  "params": {
+    "params_total": 1519906,
+    "params_trainable": 1110986
+  }
+}
