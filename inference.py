@@ -55,7 +55,7 @@ def analyze_image_mode(cfg, args, device) -> int:
     out_dir = ensure_dir(args.output or str(Path(cfg.paths.results_dir) / "realtime"))
     stem = Path(args.input).stem
     annotated = annotate_frame(image, analysis.detections,
-                               analysis.coral.assessment if analysis.coral else None,
+                               analysis.coral.assessment if analysis.coral and analysis.coral.is_coral_scene else None,
                                analysis.heatmap)
     annotated_path = write_image_bgr(annotated, out_dir / f"{stem}_annotated.jpg")
     enhanced_path = write_image_bgr(analysis.enhanced, out_dir / f"{stem}_enhanced.jpg")

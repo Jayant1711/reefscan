@@ -47,7 +47,7 @@ def page_species(cfg) -> None:
         heatmap = cv2.resize(heatmap, (image.shape[1], image.shape[0]))
 
     annotated = annotate_frame(image, analysis.detections,
-                               analysis.coral.assessment if analysis.coral else None,
+                               analysis.coral.assessment if analysis.coral and analysis.coral.is_coral_scene else None,
                                heatmap)
 
     left, right = st.columns([1.2, 1])
@@ -80,7 +80,7 @@ def page_species(cfg) -> None:
                     st.progress(min(prob, 1.0), text=f"{name}: {prob:.1%}")
         else:
             st.info("No fish detected.")
-        if analysis.coral is not None:
+        if analysis.coral is not None and analysis.coral.is_coral_scene:
             st.markdown("### Coral status")
             a = analysis.coral.assessment
             st.metric("Bleaching severity (BSI)", f"{a.index:.1f}/100", a.label)

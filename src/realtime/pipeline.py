@@ -174,8 +174,18 @@ class ReefScanPipeline:
 
     # ---------------------------------------------------------------- image
     def analyze_image(self, image_bgr: np.ndarray, frame_idx: int | None = None,
-                      track: bool = False) -> FrameAnalysis:
-        """Analyse one BGR image. ``track=True`` enables unique-ID counting (video)."""
+                      track: bool = False, allow_scene_fallback: bool = True) -> FrameAnalysis:
+        """Analyse one BGR image.
+
+        ``track=True`` enables unique-ID counting (video).
+        ``allow_scene_fallback=False`` (video mode) skips the whole-frame
+        fallback when the segmenter finds nothing — otherwise every fishless
+        frame invents a phantom detection and inflates tracker counts.
+        All model inputs below are RAW frames: every model in this repo was
+        trained on unenhanced images (NOAA patches, F4K crops, DeepFish
+        frames), so enhancement is presentation-only and must not be fed to
+        any network (train/serve skew — live-caught 2026-11-20/21).
+        """
         timings: dict[str, float] = {}
 
         t0 = time.perf_counter()
@@ -193,14 +203,17 @@ class ReefScanPipeline:
         t0 = time.perf_counter()
         coral_result: CoralResult | None = None
         if self.coral_model is not None:
-            coral_idx, coral_probs = self._predict(self.coral_model, enhanced, self.coral_img_size)
+            coral_idx, coral_probs = self._predict(self.coral_model, image_bgr, self.coral_img_size)
             p_coral = float(coral_probs[coral_idx])
             p_bleached = (
                 float(coral_probs[self.coral_classes.index("CORAL_BL")])
                 if "CORAL_BL" in self.coral_classes
                 else 1.0 - p_coral
             )
-            assessment = self.assessor.assess(enhanced, p_bleached)
+            # Whiteness/WGBS on the raw frame too: the severity estimator was
+            # calibrated on raw NOAA patches, and enhancement inflates
+            # whiteness (a blue ocean scene read "Severe 73/100" enhanced).
+            assessment = self.assessor.assess(image_bgr, p_bleached)
             coral_result = CoralResult(assessment=assessment, is_coral_scene=p_coral >= 0.5, p_coral=p_coral)
         timings["coral"] = time.perf_counter() - t0
 
@@ -225,7 +238,7 @@ class ReefScanPipeline:
         else:
             boxes = []
         scene_fallback = False
-        if not boxes:
+        if not boxes and allow_scene_fallback:
             # No segmenter / nothing found: analyse the whole frame as one region
             # so species classification always produces a usable result. Flagged
             # so the UI can present it as a scene-level guess, not a detection.
@@ -234,10 +247,14 @@ class ReefScanPipeline:
             boxes = [BBox(0, 0, w, h, 1.0, h * w)]
 
         detections: list[FishDetection] = []
-        best_box_idx = int(np.argmax([b.area for b in boxes]))
+        # allow_scene_fallback=False (video) can leave boxes empty — guard the
+        # argmax so fishless frames yield zero detections instead of crashing.
+        best_box_idx = int(np.argmax([b.area for b in boxes])) if boxes else -1
         species_probs: dict[str, float] | None = None
         for i, box in enumerate(boxes):
-            crop = enhanced[max(0, box.y1):box.y2, max(0, box.x1):box.x2]
+            # Raw-frame crop: the fish classifier was trained on raw F4K crops
+            # (enhanced crops are a train/serve skew — same family as the seg bug).
+            crop = image_bgr[max(0, box.y1):box.y2, max(0, box.x1):box.x2]
             if crop.size == 0:
                 continue
             if self.fish_model is None:
@@ -263,7 +280,7 @@ class ReefScanPipeline:
         if self._cam is not None and detections:
             t0 = time.perf_counter()
             with self._cam:
-                cam = self._cam.generate(self._preprocess(enhanced, self.fish_img_size))
+                cam = self._cam.generate(self._preprocess(image_bgr, self.fish_img_size))
             heatmap = cv2.resize(cam, (image_bgr.shape[1], image_bgr.shape[0]))
             timings["cam"] = time.perf_counter() - t0
 
@@ -281,7 +298,9 @@ class ReefScanPipeline:
         if save_artifacts and out_dir is not None:
             out = ensure_dir(out_dir)
             stem = Path(image_path).stem
-            analysis.annotated = annotate_frame(image, analysis.detections, analysis.coral.assessment if analysis.coral else None)
+            analysis.annotated = annotate_frame(
+                image, analysis.detections,
+                analysis.coral.assessment if analysis.coral and analysis.coral.is_coral_scene else None)
             write_image_bgr(analysis.annotated, out / f"{stem}_annotated.jpg")
             write_image_bgr(analysis.enhanced, out / f"{stem}_enhanced.jpg")
             if analysis.heatmap is not None:
@@ -328,12 +347,13 @@ class ReefScanPipeline:
                 if not ok or (max_frames and processed >= max_frames):
                     break
                 if frame_idx % frame_skip == 0:
-                    analysis = self.analyze_image(frame, frame_idx=frame_idx, track=True)
+                    analysis = self.analyze_image(frame, frame_idx=frame_idx, track=True,
+                                                  allow_scene_fallback=False)
                     if analysis.coral is not None:
                         trend.update(analysis.coral.assessment.index)
                     annotated = annotate_frame(
                         frame, analysis.detections,
-                        analysis.coral.assessment if analysis.coral else None,
+                        analysis.coral.assessment if analysis.coral and analysis.coral.is_coral_scene else None,
                         analysis.heatmap,
                         fps=None, frame_idx=frame_idx,
                     )
